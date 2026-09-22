@@ -7,7 +7,8 @@ import {
   AdvisorResponse,
 } from '../types/dashboard';
 
-const API_BASE = '/api/v1';
+const rawApiUrl = import.meta.env.VITE_API_URL || '';
+const API_BASE = rawApiUrl ? `${rawApiUrl.replace(/\/$/, '')}/api/v1` : '/api/v1';
 
 export const api = {
   async getOverview(systemId?: string): Promise<SystemOverview> {

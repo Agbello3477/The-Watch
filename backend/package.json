@@ -4,7 +4,7 @@
   "description": "Enterprise Monitoring, Observability & Threat Intelligence Backend for The Watch",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && mkdir -p dist/db dist/assets && cp src/db/schema.sql dist/db/schema.sql && cp src/assets/* dist/assets/ 2>/dev/null || true",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
     "test": "vitest run",
