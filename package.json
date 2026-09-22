@@ -1,0 +1,12 @@
+{
+  "name": "the-watch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Watch: Monitoring, Observability & Threat Intelligence Platform",
+  "scripts": {
+    "start:backend": "cd backend && npm run dev",
+    "start:frontend": "cd frontend && npm run dev",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build",
+    "test": "cd backend && npm test"
+  }
+}

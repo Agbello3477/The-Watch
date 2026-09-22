@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for persistent audit trails and probe history
+  postgres:
+    image: postgres:16-alpine
+    container_name: the_watch_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: the_watch_db
+      POSTGRES_USER: watch_admin
+      POSTGRES_PASSWORD: watch_secure_password_2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U watch_admin -d the_watch_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis for sliding window rate limiting and high-throughput counters
+  redis:
+    image: redis:7-alpine
+    container_name: the_watch_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # The Watch Backend (Ingest API, Prober, Threat Engine & Report Generator)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: the_watch_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      UDP_PORT: 9876
+      DATABASE_URL: postgresql://watch_admin:watch_secure_password_2026@postgres:5432/the_watch_db
+      REDIS_URL: redis://redis:6379
+      HMAC_SECRET: the-watch-enterprise-hmac-master-key-2026
+      NODE_ENV: production
+    ports:
+      - "4000:4000"
+      - "9876:9876/udp"
+
+  # The Watch Administrative SOC Dashboard
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: the_watch_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
+  redis_data:

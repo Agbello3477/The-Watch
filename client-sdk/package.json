@@ -1,0 +1,14 @@
+{
+  "name": "@the-watch/sentinel-agent",
+  "version": "1.0.0",
+  "description": "Ultra-lightweight, zero-overhead telemetry sentinel middleware for NOUN-HRMS and institutional apps",
+  "main": "dist/sentinel-agent.js",
+  "types": "dist/sentinel-agent.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "typescript": "^5.7.2"
+  }
+}
