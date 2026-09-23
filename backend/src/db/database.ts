@@ -1,7 +1,38 @@
-import { Pool, QueryResult } from 'pg';
+import { Pool } from 'pg';
 import { CONFIG, REGISTERED_TENANTS, DEFAULT_PROBES } from '../config';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+
+export interface User {
+  id: string;
+  email: string;
+  password_hash: string;
+  salt: string;
+  full_name: string;
+  role: 'SUPER_ADMIN' | 'SOC_ANALYST' | 'SECURITY_OPERATOR' | 'AUDITOR';
+  status: 'ACTIVE' | 'SUSPENDED';
+  allowed_systems: string; // 'ALL' or comma-separated systemIds
+  failed_login_attempts: number;
+  locked_until?: string | null;
+  last_login_at?: string | null;
+  last_login_ip?: string | null;
+  created_by?: string;
+  created_at?: string;
+}
+
+export interface UserAuditLog {
+  id: string;
+  user_id?: string;
+  email: string;
+  action: 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'ACCOUNT_CREATED' | 'ACCOUNT_SUSPENDED' | 'ACCOUNT_ACTIVATED' | 'ACCOUNT_DELETED';
+  ip_address: string;
+  user_agent?: string;
+  status: 'SUCCESS' | 'FAILED' | 'BLOCKED';
+  details?: string;
+  created_at_wat: string;
+  created_at?: string;
+}
 
 export interface TelemetryLog {
   id: string;
@@ -121,12 +152,23 @@ export function getWATFormattedDate(d: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-GB', options).format(d) + ' WAT';
 }
 
+/**
+ * Helper to hash password using PBKDF2 with unique cryptographic salt
+ */
+export function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
+  const generatedSalt = salt || crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, generatedSalt, 100000, 64, 'sha512').toString('hex');
+  return { hash, salt: generatedSalt };
+}
+
 class DatabaseManager {
   private pgPool: Pool | null = null;
   private isPostgresConnected = false;
 
   // Embedded store for local dev & zero-config operation
   private memoryStore = {
+    users: new Map<string, User>(),
+    userAuditLogs: [] as UserAuditLog[],
     tenants: new Map<string, any>(),
     telemetryLogs: [] as TelemetryLog[],
     threatIncidents: [] as ThreatIncident[],
@@ -169,12 +211,74 @@ class DatabaseManager {
       }
     }
 
-    // Seed default tenants and probes
+    // Seed default users, tenants, and probes
     await this.seedDefaults();
   }
 
   private async seedDefaults(): Promise<void> {
-    // Seed Tenants
+    // 1. Seed Default Super Admin
+    const superAdminEmail = 'abdulgaffarbello3477@gmail.com';
+    const { hash, salt } = hashPassword('Agbello@3477');
+
+    const superAdminUser: User = {
+      id: 'usr-superadmin-001',
+      email: superAdminEmail,
+      password_hash: hash,
+      salt,
+      full_name: 'Abdulgaffar Bello (Super Admin)',
+      role: 'SUPER_ADMIN',
+      status: 'ACTIVE',
+      allowed_systems: 'ALL',
+      failed_login_attempts: 0,
+      locked_until: null,
+      created_by: 'SYSTEM_BOOTSTRAP',
+      created_at: new Date().toISOString(),
+    };
+
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        await this.pgPool.query(
+          `INSERT INTO users (id, email, password_hash, salt, full_name, role, status, allowed_systems, failed_login_attempts, created_by, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           ON CONFLICT (email) DO NOTHING`,
+          [
+            superAdminUser.id,
+            superAdminUser.email,
+            superAdminUser.password_hash,
+            superAdminUser.salt,
+            superAdminUser.full_name,
+            superAdminUser.role,
+            superAdminUser.status,
+            superAdminUser.allowed_systems,
+            0,
+            superAdminUser.created_by,
+            superAdminUser.created_at,
+          ]
+        );
+      } catch (e) {}
+    }
+
+    this.memoryStore.users.set(superAdminEmail, superAdminUser);
+
+    // 2. Seed Default Institutional Operators
+    const analystEmail = 'analyst.soc@noun.edu.ng';
+    const { hash: aHash, salt: aSalt } = hashPassword('Analyst@2026');
+    this.memoryStore.users.set(analystEmail, {
+      id: 'usr-analyst-002',
+      email: analystEmail,
+      password_hash: aHash,
+      salt: aSalt,
+      full_name: 'Ibrahim Danjuma (Lead Analyst)',
+      role: 'SOC_ANALYST',
+      status: 'ACTIVE',
+      allowed_systems: 'NOUN-HRMS,Clinic-EHR',
+      failed_login_attempts: 0,
+      locked_until: null,
+      created_by: superAdminEmail,
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+    });
+
+    // 3. Seed Tenants
     for (const [key, tenant] of Object.entries(REGISTERED_TENANTS)) {
       this.memoryStore.tenants.set(tenant.systemId, {
         id: `tenant-${tenant.systemId.toLowerCase()}`,
@@ -188,7 +292,7 @@ class DatabaseManager {
       });
     }
 
-    // Seed Default Probes
+    // 4. Seed Default Probes
     for (const probe of DEFAULT_PROBES) {
       this.memoryStore.syntheticProbes.set(probe.id, {
         id: probe.id,
@@ -209,6 +313,221 @@ class DatabaseManager {
         created_at: new Date().toISOString(),
       });
     }
+
+    // 5. Seed initial audit log
+    this.saveUserAuditLog({
+      id: 'ual-init-001',
+      user_id: superAdminUser.id,
+      email: superAdminEmail,
+      action: 'ACCOUNT_CREATED',
+      ip_address: '102.89.23.45',
+      user_agent: 'The Watch Bootstrap Agent v2.4',
+      status: 'SUCCESS',
+      details: 'Super Admin master account initialized with cryptographic PBKDF2 hash',
+      created_at_wat: getWATFormattedDate(),
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  // ===================== USER MANAGEMENT =====================
+  public async getUserByEmail(email: string): Promise<User | null> {
+    const cleanEmail = email.toLowerCase().trim();
+
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        const res = await this.pgPool.query('SELECT * FROM users WHERE LOWER(email) = $1', [cleanEmail]);
+        return res.rows[0] || null;
+      } catch (e) {}
+    }
+
+    for (const user of this.memoryStore.users.values()) {
+      if (user.email.toLowerCase() === cleanEmail) {
+        return user;
+      }
+    }
+    return null;
+  }
+
+  public async getUserById(id: string): Promise<User | null> {
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        const res = await this.pgPool.query('SELECT * FROM users WHERE id = $1', [id]);
+        return res.rows[0] || null;
+      } catch (e) {}
+    }
+
+    for (const user of this.memoryStore.users.values()) {
+      if (user.id === id) {
+        return user;
+      }
+    }
+    return null;
+  }
+
+  public async getAllUsers(): Promise<Omit<User, 'password_hash' | 'salt'>[]> {
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        const res = await this.pgPool.query(
+          'SELECT id, email, full_name, role, status, allowed_systems, failed_login_attempts, locked_until, last_login_at, last_login_ip, created_by, created_at FROM users ORDER BY created_at DESC'
+        );
+        return res.rows;
+      } catch (e) {}
+    }
+
+    return Array.from(this.memoryStore.users.values()).map((u) => {
+      const { password_hash, salt, ...safeUser } = u;
+      return safeUser;
+    });
+  }
+
+  public async saveUser(user: User): Promise<void> {
+    if (!user.id) user.id = `usr-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    if (!user.created_at) user.created_at = new Date().toISOString();
+    user.email = user.email.toLowerCase().trim();
+
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        await this.pgPool.query(
+          `INSERT INTO users (id, email, password_hash, salt, full_name, role, status, allowed_systems, failed_login_attempts, created_by, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          [
+            user.id,
+            user.email,
+            user.password_hash,
+            user.salt,
+            user.full_name,
+            user.role,
+            user.status,
+            user.allowed_systems || 'ALL',
+            user.failed_login_attempts || 0,
+            user.created_by || 'SUPER_ADMIN',
+            user.created_at,
+          ]
+        );
+      } catch (e) {}
+    }
+
+    this.memoryStore.users.set(user.email, user);
+  }
+
+  public async updateUserStatus(id: string, status: 'ACTIVE' | 'SUSPENDED'): Promise<User | null> {
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        const res = await this.pgPool.query('UPDATE users SET status = $1 WHERE id = $2 RETURNING *', [status, id]);
+        if (res.rows.length > 0) return res.rows[0];
+      } catch (e) {}
+    }
+
+    for (const user of this.memoryStore.users.values()) {
+      if (user.id === id) {
+        user.status = status;
+        return user;
+      }
+    }
+    return null;
+  }
+
+  public async updateUserLoginMetrics(id: string, ip: string): Promise<void> {
+    const now = new Date().toISOString();
+
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        await this.pgPool.query(
+          'UPDATE users SET last_login_at = $1, last_login_ip = $2, failed_login_attempts = 0, locked_until = NULL WHERE id = $3',
+          [now, ip, id]
+        );
+      } catch (e) {}
+    }
+
+    for (const user of this.memoryStore.users.values()) {
+      if (user.id === id) {
+        user.last_login_at = now;
+        user.last_login_ip = ip;
+        user.failed_login_attempts = 0;
+        user.locked_until = null;
+        break;
+      }
+    }
+  }
+
+  public async incrementFailedLoginAttempts(email: string, lockUntil?: string): Promise<void> {
+    const cleanEmail = email.toLowerCase().trim();
+
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        await this.pgPool.query(
+          'UPDATE users SET failed_login_attempts = failed_login_attempts + 1, locked_until = COALESCE($1, locked_until) WHERE LOWER(email) = $2',
+          [lockUntil || null, cleanEmail]
+        );
+      } catch (e) {}
+    }
+
+    const user = this.memoryStore.users.get(cleanEmail);
+    if (user) {
+      user.failed_login_attempts = (user.failed_login_attempts || 0) + 1;
+      if (lockUntil) user.locked_until = lockUntil;
+    }
+  }
+
+  public async deleteUser(id: string): Promise<boolean> {
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        const res = await this.pgPool.query('DELETE FROM users WHERE id = $1', [id]);
+        return (res.rowCount || 0) > 0;
+      } catch (e) {}
+    }
+
+    for (const [key, user] of this.memoryStore.users.entries()) {
+      if (user.id === id) {
+        this.memoryStore.users.delete(key);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // ===================== USER AUDIT LOGS =====================
+  public async saveUserAuditLog(log: UserAuditLog): Promise<void> {
+    if (!log.id) log.id = `ual-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    if (!log.created_at) log.created_at = new Date().toISOString();
+    if (!log.created_at_wat) log.created_at_wat = getWATFormattedDate();
+
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        await this.pgPool.query(
+          `INSERT INTO user_audit_logs (id, user_id, email, action, ip_address, user_agent, status, details, created_at_wat, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            log.id,
+            log.user_id || null,
+            log.email,
+            log.action,
+            log.ip_address,
+            log.user_agent || null,
+            log.status,
+            log.details || null,
+            log.created_at_wat,
+            log.created_at,
+          ]
+        );
+      } catch (e) {}
+    }
+
+    this.memoryStore.userAuditLogs.unshift(log);
+    if (this.memoryStore.userAuditLogs.length > 2000) {
+      this.memoryStore.userAuditLogs.length = 2000;
+    }
+  }
+
+  public async getUserAuditLogs(limit: number = 100): Promise<UserAuditLog[]> {
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        const res = await this.pgPool.query('SELECT * FROM user_audit_logs ORDER BY created_at DESC LIMIT $1', [limit]);
+        return res.rows;
+      } catch (e) {}
+    }
+
+    return this.memoryStore.userAuditLogs.slice(0, limit);
   }
 
   // ===================== TENANTS =====================
@@ -217,9 +536,7 @@ class DatabaseManager {
       try {
         const res = await this.pgPool.query('SELECT * FROM tenants WHERE api_key = $1 AND enabled = true', [apiKey]);
         return res.rows[0] || null;
-      } catch (e) {
-        // fallback
-      }
+      } catch (e) {}
     }
     for (const tenant of this.memoryStore.tenants.values()) {
       if (tenant.api_key === apiKey && tenant.enabled) {
@@ -234,9 +551,7 @@ class DatabaseManager {
       try {
         const res = await this.pgPool.query('SELECT * FROM tenants WHERE system_id = $1', [systemId]);
         return res.rows[0] || null;
-      } catch (e) {
-        // fallback
-      }
+      } catch (e) {}
     }
     return this.memoryStore.tenants.get(systemId) || null;
   }
@@ -279,7 +594,6 @@ class DatabaseManager {
     }
 
     this.memoryStore.telemetryLogs.unshift(log);
-    // Keep max 2000 in memory for high efficiency
     if (this.memoryStore.telemetryLogs.length > 2000) {
       this.memoryStore.telemetryLogs.length = 2000;
     }
@@ -478,7 +792,6 @@ class DatabaseManager {
       if (data.sslExpiryDays !== undefined) probe.ssl_expiry_days = data.sslExpiryDays;
       probe.last_run_at = now;
 
-      // recalculate running uptime
       const history = this.memoryStore.probeHistory.filter((h) => h.probe_id === probeId);
       if (history.length > 0) {
         const successCount = history.filter((h) => h.is_success).length;
@@ -486,7 +799,6 @@ class DatabaseManager {
       }
     }
 
-    // Save history record
     const historyRecord: ProbeHistoryRecord = {
       id: `ph-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
       probe_id: probeId,
@@ -552,28 +864,22 @@ class DatabaseManager {
     const highIncidents = unresolvedIncidents.filter((i) => i.severity === 'HIGH').length;
     const medIncidents = unresolvedIncidents.filter((i) => i.severity === 'MEDIUM').length;
 
-    // Calculate Platform Health Score (0-100%)
     let healthScore = 100;
-    // Down probes deduct 25 points each
     const downProbes = probes.filter((p) => p.last_status === 'DOWN').length;
     const degradedProbes = probes.filter((p) => p.last_status === 'DEGRADED').length;
     healthScore -= downProbes * 25;
     healthScore -= degradedProbes * 10;
-    // Critical incidents deduct 15 points each
     healthScore -= criticalIncidents * 15;
     healthScore -= highIncidents * 5;
     healthScore -= medIncidents * 2;
-    // Slow queries deduct score
     const slowQueries = queryMetrics.filter((q) => q.duration_ms > 200).length;
     if (slowQueries > 5) healthScore -= 5;
     if (healthScore < 0) healthScore = 0;
 
-    // Average TTFB
     const avgTtfb = probes.length > 0
       ? probes.reduce((acc, p) => acc + (p.last_ttfb_ms || 0), 0) / probes.length
       : 0;
 
-    // Threat level calculation
     let threatLevel: 'NORMAL' | 'ELEVATED' | 'SEVERE' | 'CRITICAL' = 'NORMAL';
     if (criticalIncidents > 0 || unresolvedIncidents.length > 10) {
       threatLevel = 'CRITICAL';

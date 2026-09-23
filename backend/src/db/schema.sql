@@ -12,6 +12,36 @@ CREATE TABLE IF NOT EXISTS tenants (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(64) PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    salt VARCHAR(128) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    role VARCHAR(32) NOT NULL DEFAULT 'SOC_ANALYST', -- SUPER_ADMIN, SOC_ANALYST, SECURITY_OPERATOR, AUDITOR
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, SUSPENDED
+    allowed_systems VARCHAR(255) DEFAULT 'ALL', -- ALL or comma-separated system_ids
+    failed_login_attempts INTEGER DEFAULT 0,
+    locked_until TIMESTAMP WITH TIME ZONE,
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    last_login_ip VARCHAR(64),
+    created_by VARCHAR(255) DEFAULT 'SYSTEM',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_audit_logs (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64),
+    email VARCHAR(255) NOT NULL,
+    action VARCHAR(64) NOT NULL, -- LOGIN_SUCCESS, LOGIN_FAILED, ACCOUNT_CREATED, ACCOUNT_SUSPENDED, ACCOUNT_ACTIVATED, ACCOUNT_DELETED
+    ip_address VARCHAR(64) NOT NULL,
+    user_agent TEXT,
+    status VARCHAR(32) NOT NULL DEFAULT 'SUCCESS', -- SUCCESS, FAILED, BLOCKED
+    details TEXT,
+    created_at_wat VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS telemetry_logs (
     id VARCHAR(64) PRIMARY KEY,
     system_id VARCHAR(64) NOT NULL REFERENCES tenants(system_id) ON DELETE CASCADE,
@@ -113,7 +143,9 @@ CREATE TABLE IF NOT EXISTS audit_reports (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indices for rapid query observability and incident filtering
+-- Indices for rapid query observability, users, and incident filtering
+CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+CREATE INDEX IF NOT EXISTS idx_user_audit_time ON user_audit_logs (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_telemetry_system_time ON telemetry_logs (system_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_threat_incidents_system_status ON threat_incidents (system_id, status, severity);
 CREATE INDEX IF NOT EXISTS idx_threat_incidents_ip ON threat_incidents (offending_ip);

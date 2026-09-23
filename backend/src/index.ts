@@ -16,6 +16,8 @@ import { queriesRouter } from './routes/queries';
 import { advisorRouter } from './routes/advisor';
 import { reportsRouter } from './routes/reports';
 import { simulationRouter } from './routes/simulation';
+import { authRouter } from './routes/auth';
+import { usersRouter } from './routes/users';
 import { ingestQueue } from './ingest/ingest-queue';
 
 export const app = express();
@@ -62,6 +64,8 @@ app.get('/api/mock/dispatch/health', (req, res) => {
 });
 
 // REST API Routers
+app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/telemetry', httpIngestRouter);
 app.use('/api/v1/overview', overviewRouter);
 app.use('/api/v1/incidents', incidentsRouter);

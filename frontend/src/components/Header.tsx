@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Clock, Layers, RefreshCw } from 'lucide-react';
-import { SystemOverview } from '../types/dashboard';
+import { Clock, Layers, RefreshCw, User, LogOut, KeyRound, Home, Users, ShieldCheck } from 'lucide-react';
+import { SystemOverview, AuthSessionUser } from '../types/dashboard';
 
 interface HeaderProps {
   overview: SystemOverview | null;
@@ -10,6 +10,12 @@ interface HeaderProps {
   isRefreshing: boolean;
   autoRefreshInterval: number;
   setAutoRefreshInterval: (interval: number) => void;
+  currentUser: AuthSessionUser | null;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  onOpenLogin: () => void;
+  onLogout: () => void;
+  onGoHome: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,6 +26,12 @@ export const Header: React.FC<HeaderProps> = ({
   isRefreshing,
   autoRefreshInterval,
   setAutoRefreshInterval,
+  currentUser,
+  activeTab,
+  onTabChange,
+  onOpenLogin,
+  onLogout,
+  onGoHome,
 }) => {
   const [watTime, setWatTime] = useState<string>('');
 
@@ -59,9 +71,12 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="bg-slate-900/90 backdrop-blur border-b border-slate-800 sticky top-0 z-40 px-6 py-3 transition-all">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         
-        {/* Brand & Logo with MaSha Tech Innovations */}
+        {/* Brand & Logo */}
         <div className="flex items-center gap-3.5">
-          <div className="relative flex items-center justify-center w-12 h-12 rounded-xl bg-slate-950/80 p-1 shadow-lg shadow-cyan-500/10 border border-slate-700/80 overflow-hidden shrink-0">
+          <div 
+            onClick={onGoHome}
+            className="relative flex items-center justify-center w-11 h-11 rounded-xl bg-slate-950/80 p-1 shadow-lg shadow-cyan-500/10 border border-slate-700/80 overflow-hidden shrink-0 cursor-pointer hover:border-cyan-500 transition"
+          >
             <img
               src="/logo.jpg"
               alt="The Watch Logo"
@@ -74,29 +89,68 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black tracking-wider text-white">THE WATCH</h1>
-              <span className="text-[10px] uppercase font-bold tracking-widest bg-cyan-950 text-cyan-400 border border-cyan-800 px-2 py-0.5 rounded">
-                ENTERPRISE SOC v2.4
+              <h1 
+                onClick={onGoHome}
+                className="text-lg font-black tracking-wider text-white cursor-pointer hover:text-cyan-400 transition"
+              >
+                THE WATCH
+              </h1>
+              <span className="text-[9px] uppercase font-mono font-bold tracking-widest bg-cyan-950 text-cyan-400 border border-cyan-800 px-1.5 py-0.5 rounded">
+                v2.4 SOC
               </span>
             </div>
             <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-              <span>External Observability & Threat Gateway</span>
+              <span>Observability & Threat Gateway</span>
               <span className="text-slate-600">•</span>
-              <span className="text-cyan-400/90 font-mono text-[11px]">Zero-Overhead Watchdog</span>
+              <span className="text-cyan-400/90 font-mono text-[10px]">Zero Host Overhead</span>
             </p>
           </div>
         </div>
 
-        {/* Center: System Selector & Threat Status */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-1">
+        {/* Center Navigation & System Selector */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl p-1">
+            <button
+              onClick={onGoHome}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
+                activeTab === 'home' ? 'bg-slate-800 text-cyan-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>Home</span>
+            </button>
+
+            <button
+              onClick={() => onTabChange('overview')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
+                activeTab !== 'home' && activeTab !== 'users' ? 'bg-slate-800 text-cyan-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>SOC Command</span>
+            </button>
+
+            {currentUser?.role === 'SUPER_ADMIN' && (
+              <button
+                onClick={() => onTabChange('users')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
+                  activeTab === 'users' ? 'bg-indigo-950 text-indigo-300 font-bold border border-indigo-700/60' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Users & Audit</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1">
             <Layers className="w-4 h-4 text-slate-400 ml-2 mr-1.5" />
             <select
               value={selectedSystem}
               onChange={(e) => onSelectSystem(e.target.value)}
-              className="bg-transparent text-sm font-semibold text-slate-200 focus:outline-none pr-3 cursor-pointer py-1"
+              className="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none pr-3 cursor-pointer py-1"
             >
-              <option value="" className="bg-slate-900 text-slate-100">All Institutional Systems</option>
+              <option value="" className="bg-slate-900 text-slate-100">All Systems (Universal)</option>
               <option value="NOUN-HRMS" className="bg-slate-900 text-slate-100">NOUN-HRMS (Flagship)</option>
               <option value="Clinic-EHR" className="bg-slate-900 text-slate-100">Clinic-EHR (Medical)</option>
               <option value="Security-Dispatch" className="bg-slate-900 text-slate-100">Security-Dispatch (Campus)</option>
@@ -106,22 +160,22 @@ export const Header: React.FC<HeaderProps> = ({
           {getThreatBadge()}
         </div>
 
-        {/* Right Controls: WAT Clock & Auto Refresh */}
-        <div className="flex items-center gap-3.5">
-          <div className="hidden lg:flex items-center gap-1.5 bg-slate-950/80 border border-slate-800/80 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-300">
+        {/* Right Controls: WAT Clock & User Profile / Login */}
+        <div className="flex items-center gap-3">
+          <div className="hidden xl:flex items-center gap-1.5 bg-slate-950/80 border border-slate-800/80 px-2.5 py-1.5 rounded-xl text-[11px] font-mono text-slate-300">
             <Clock className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{watTime || 'Loading WAT...'}</span>
+            <span>{watTime || 'WAT (UTC+1)'}</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <select
               value={autoRefreshInterval}
               onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
-              className="bg-slate-950 border border-slate-800 text-xs text-slate-400 rounded-lg px-2.5 py-1.5 focus:outline-none cursor-pointer"
+              className="bg-slate-950 border border-slate-800 text-[11px] text-slate-400 rounded-lg px-2 py-1.5 focus:outline-none cursor-pointer"
             >
-              <option value={5000}>Auto 5s</option>
-              <option value={10000}>Auto 10s</option>
-              <option value={30000}>Auto 30s</option>
+              <option value={5000}>5s</option>
+              <option value={10000}>10s</option>
+              <option value={30000}>30s</option>
               <option value={0}>Manual</option>
             </select>
 
@@ -129,11 +183,39 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onRefresh}
               disabled={isRefreshing}
               title="Refresh telemetry"
-              className="flex items-center justify-center w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
             >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
             </button>
           </div>
+
+          {/* User Profile or Sign In Button */}
+          {currentUser ? (
+            <div className="flex items-center space-x-2 pl-1 border-l border-slate-800">
+              <div className="hidden sm:block text-right">
+                <div className="text-xs font-semibold text-slate-200">{currentUser.fullName}</div>
+                <div className="text-[10px] text-indigo-400 font-mono font-bold">
+                  {currentUser.role}
+                </div>
+              </div>
+
+              <button
+                onClick={onLogout}
+                title="Sign Out"
+                className="p-2 rounded-lg bg-slate-800/80 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-900/50 transition cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onOpenLogin}
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-md shadow-cyan-500/20 transition cursor-pointer"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </button>
+          )}
         </div>
 
       </div>

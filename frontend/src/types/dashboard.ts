@@ -137,3 +137,62 @@ export interface AdvisorResponse {
   activeDiagnoses: RemediationRecommendation[];
   allCatalogRules: any[];
 }
+
+export interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'SUPER_ADMIN' | 'SOC_ANALYST' | 'SECURITY_OPERATOR' | 'AUDITOR';
+  status: 'ACTIVE' | 'SUSPENDED';
+  allowed_systems: string;
+  failed_login_attempts?: number;
+  locked_until?: string | null;
+  last_login_at?: string | null;
+  last_login_ip?: string | null;
+  created_by?: string;
+  created_at?: string;
+}
+
+export interface AuthSessionUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: 'SUPER_ADMIN' | 'SOC_ANALYST' | 'SECURITY_OPERATOR' | 'AUDITOR';
+  status: 'ACTIVE' | 'SUSPENDED';
+  allowedSystems: string;
+  lastLoginAt?: string;
+  lastLoginIp?: string;
+}
+
+export interface LoginResponse {
+  success: boolean;
+  token?: string;
+  user?: AuthSessionUser;
+  error?: string;
+  code?: 'INVALID_CREDENTIALS' | 'ACCOUNT_LOCKED' | 'ACCOUNT_SUSPENDED' | 'RATE_LIMITED';
+  lockedUntil?: string;
+}
+
+export interface UserAuditLog {
+  id: string;
+  user_id?: string;
+  email: string;
+  action: 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'ACCOUNT_CREATED' | 'ACCOUNT_SUSPENDED' | 'ACCOUNT_ACTIVATED' | 'ACCOUNT_DELETED';
+  ip_address: string;
+  user_agent?: string;
+  status: 'SUCCESS' | 'FAILED' | 'BLOCKED';
+  details?: string;
+  created_at_wat: string;
+  created_at?: string;
+}
+
+export interface UsersListResponse {
+  totalUsers: number;
+  users: User[];
+}
+
+export interface UserAuditLogsResponse {
+  totalLogs: number;
+  logs: UserAuditLog[];
+}
+
