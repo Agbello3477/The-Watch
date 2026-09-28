@@ -618,6 +618,21 @@ class DatabaseManager {
     return logs.slice(0, limit);
   }
 
+  public async getRecentTelemetryLogs(systemId: string, limit: number = 100): Promise<TelemetryLog[]> {
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        const result = await this.pgPool.query(
+          `SELECT * FROM telemetry_logs WHERE system_id = $1 ORDER BY created_at DESC LIMIT $2`,
+          [systemId, limit]
+        );
+        return result.rows;
+      } catch (e) {}
+    }
+    return this.memoryStore.telemetryLogs
+      .filter(l => l.system_id === systemId)
+      .slice(0, limit);
+  }
+
   // ===================== THREAT INCIDENTS =====================
   public async saveIncident(incident: ThreatIncident): Promise<void> {
     if (!incident.id) incident.id = `inc-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;

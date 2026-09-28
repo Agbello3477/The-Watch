@@ -8,6 +8,7 @@ import { QueryLatencyAnalyzer } from './components/QueryLatencyAnalyzer';
 import { RemediationAdvisor } from './components/RemediationAdvisor';
 import { ReportExporter } from './components/ReportExporter';
 import { AttackSimulator } from './components/AttackSimulator';
+import { TrafficMonitor } from './components/TrafficMonitor';
 import { LandingHome } from './components/LandingHome';
 import { LoginModal } from './components/LoginModal';
 import { UserManagement } from './components/UserManagement';
@@ -26,7 +27,7 @@ import { Globe, Activity, Sparkles, FileText, Flame, Users, ShieldCheck } from '
 export const App: React.FC = () => {
   const [selectedSystem, setSelectedSystem] = useState<string>('');
   const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'users'>('home');
-  const [activeSocTab, setActiveSocTab] = useState<'threats' | 'observability' | 'advisor' | 'reports' | 'simulator'>('threats');
+  const [activeSocTab, setActiveSocTab] = useState<'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'traffic'>('threats');
   
   // Auth state
   const [currentUser, setCurrentUser] = useState<AuthSessionUser | null>(authStorage.getUser());
@@ -192,8 +193,8 @@ export const App: React.FC = () => {
             <HealthGaugeCard overview={overview} />
 
             {/* Sub-Navigation Tabs */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+            <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide items-center justify-between gap-3 border-b border-slate-800 pb-3" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 shrink-0">
                 
                 <button
                   onClick={() => setActiveSocTab('threats')}
@@ -260,6 +261,18 @@ export const App: React.FC = () => {
                   <span>Attack Simulator</span>
                 </button>
 
+                <button
+                  onClick={() => setActiveSocTab('traffic')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                    activeSocTab === 'traffic'
+                      ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                      : 'text-emerald-400 hover:text-emerald-300'
+                  }`}
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>HRMS Traffic</span>
+                </button>
+
               </div>
 
               <span className="text-xs text-slate-500 font-mono hidden md:inline">
@@ -303,6 +316,12 @@ export const App: React.FC = () => {
                   selectedSystem={selectedSystem}
                   onSimulationTriggered={fetchData}
                 />
+              </div>
+            )}
+
+            {activeSocTab === 'traffic' && (
+              <div className="space-y-6">
+                <TrafficMonitor selectedSystem={selectedSystem || 'NOUN-HRMS'} />
               </div>
             )}
           </>

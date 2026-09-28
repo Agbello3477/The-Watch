@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Menu, X as XIcon } from 'lucide-react';
 import { Clock, Layers, RefreshCw, User, LogOut, KeyRound, Home, Users, ShieldCheck } from 'lucide-react';
 import { SystemOverview, AuthSessionUser } from '../types/dashboard';
 
@@ -34,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   onGoHome,
 }) => {
   const [watTime, setWatTime] = useState<string>('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const updateTime = () => {
@@ -107,8 +109,15 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
+        {/* Mobile Menu Toggle */}
+        <div className="flex md:hidden items-center ml-auto">
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-400 hover:text-white">
+            {isMobileMenuOpen ? <XIcon className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+
         {/* Center Navigation & System Selector */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className={`${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col md:flex-row absolute md:static top-full left-0 right-0 bg-slate-900 md:bg-transparent border-b md:border-b-0 border-slate-800 p-4 md:p-0 items-start md:items-center gap-2.5`}>
           <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl p-1">
             <button
               onClick={onGoHome}

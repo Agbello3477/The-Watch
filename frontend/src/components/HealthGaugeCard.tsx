@@ -26,7 +26,7 @@ export const HealthGaugeCard: React.FC<HealthGaugeCardProps> = ({ overview }) =>
   const strokeDashoffset = circumference - (healthScore / 100) * circumference;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       
       {/* 1. Health Score Circular Gauge */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-sm flex items-center justify-between">

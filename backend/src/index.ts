@@ -18,6 +18,7 @@ import { reportsRouter } from './routes/reports';
 import { simulationRouter } from './routes/simulation';
 import { authRouter } from './routes/auth';
 import { usersRouter } from './routes/users';
+import { trafficRouter } from './routes/traffic.js';
 import { ingestQueue } from './ingest/ingest-queue';
 
 export const app = express();
@@ -75,6 +76,7 @@ app.use('/api/v1/queries', queriesRouter);
 app.use('/api/v1/advisor', advisorRouter);
 app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/simulation', simulationRouter);
+app.use('/api/v1/traffic', trafficRouter);
 
 // Root health check
 app.get('/health', (req, res) => {

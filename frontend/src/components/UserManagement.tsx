@@ -219,7 +219,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
       </div>
 
       {/* Sub-Tabs: Users Directory vs Audit Trail */}
-      <div className="flex items-center space-x-2 border-b border-slate-800 pb-2">
+      <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide items-center space-x-2 border-b border-slate-800 pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <button
           onClick={() => setActiveSubTab('users')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
@@ -412,8 +412,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
 
       {/* Modal: Create New User */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-          <div className="relative w-full max-w-lg bg-slate-900 border border-indigo-800/60 rounded-2xl shadow-2xl shadow-indigo-950/80 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div className="relative w-full h-full sm:h-auto max-w-lg bg-slate-900 border-0 sm:border border-indigo-800/60 rounded-none sm:rounded-2xl shadow-2xl shadow-indigo-950/80 overflow-y-auto overflow-hidden flex flex-col justify-start sm:block">
             <div className="px-6 py-4 bg-slate-800/80 border-b border-slate-700/80 flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
                 <UserPlus className="w-5 h-5 text-indigo-400" />

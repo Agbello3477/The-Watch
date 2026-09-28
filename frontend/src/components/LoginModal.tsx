@@ -71,9 +71,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
       <div 
-        className="relative w-full max-w-md bg-slate-900 border border-cyan-800/60 rounded-2xl shadow-2xl shadow-cyan-950/80 overflow-hidden"
+        className="relative w-full h-full sm:h-auto max-w-md bg-slate-900 border-0 sm:border border-cyan-800/60 rounded-none sm:rounded-2xl shadow-2xl shadow-cyan-950/80 overflow-hidden flex flex-col justify-center sm:block"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Accent Header */}

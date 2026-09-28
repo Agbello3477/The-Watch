@@ -31,7 +31,7 @@ export const ThreatMap: React.FC<ThreatMapProps> = ({ nodes }) => {
   };
 
   return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-sm">
+    <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-sm max-w-full overflow-hidden">
       
       {/* Map Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
