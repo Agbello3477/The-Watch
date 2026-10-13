@@ -4,6 +4,7 @@ import { ddosDetector } from '../threat/ddos-detector';
 import { geoIPService } from '../threat/geoip-service';
 import { advisorService } from '../advisor/advisor-service';
 import { notificationDispatcher } from '../alerts/notification-dispatcher';
+import { socEngine } from '../soc/soc-engine';
 
 export interface TelemetryPayload {
   systemId: string;
@@ -72,6 +73,23 @@ export class IngestQueue {
       queryText,
       errorMessage,
     } = item;
+
+    // 0. Active SOC Firewall check: Drop immediately if IP is blacklisted
+    if (socEngine.isIpBlocked(clientIp)) {
+      socEngine.recordBlockedRequest(clientIp);
+      await db.saveTelemetryLog({
+        id: `tel-blocked-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        system_id: systemId,
+        method: method || 'GET',
+        path: path || '/',
+        status_code: 403,
+        latency_ms: 1,
+        client_ip: clientIp,
+        payload_snippet: `[BLOCKED_BY_SOC_FIREWALL] Dropped request from quarantined IP`,
+        user_agent: userAgent,
+      });
+      return;
+    }
 
     // 1. Save standard telemetry log
     await db.saveTelemetryLog({
@@ -176,6 +194,29 @@ export class IngestQueue {
 
       await db.saveIncident(incident);
       await notificationDispatcher.dispatchIncidentAlert(incident);
+
+      // SOC Escalation: Create Case and execute automated quarantine
+      socEngine.createCaseFromIncident({
+        id: incident.id,
+        systemId,
+        threatClassification: incident.threat_classification,
+        severity: incident.severity,
+        offendingIp: clientIp,
+        targetEndpoint: path,
+        capturedPayload: incident.captured_payload,
+      });
+
+      if (threatMatch.severity === 'CRITICAL') {
+        socEngine.blockIp({
+          ip: clientIp,
+          reason: `Automated SOC Quarantine: ${threatMatch.threatClassification}`,
+          threatClassification: threatMatch.threatClassification,
+          systemId,
+          blockedBy: 'The Watch Heuristic WAF Engine',
+          durationHours: 24,
+        });
+      }
+
       return;
     }
 
@@ -215,6 +256,18 @@ export class IngestQueue {
 
       await db.saveIncident(incident);
       await notificationDispatcher.dispatchIncidentAlert(incident);
+
+      // SOC Escalation: Create Case
+      socEngine.createCaseFromIncident({
+        id: incident.id,
+        systemId,
+        threatClassification: incident.threat_classification,
+        severity: incident.severity,
+        offendingIp: clientIp,
+        targetEndpoint: path,
+        capturedPayload: incident.captured_payload,
+      });
+
       return;
     }
 

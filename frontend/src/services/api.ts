@@ -11,6 +11,13 @@ import {
   UserAuditLog,
   UsersListResponse,
   UserAuditLogsResponse,
+  SocMetrics,
+  SocCase,
+  IpBlocklistEntry,
+  IocEntry,
+  SocPlaybook,
+  DetectionRule,
+  ShiftHandover,
 } from '../types/dashboard';
 
 const rawApiUrl = (import.meta as any).env?.VITE_API_URL || '';
@@ -259,5 +266,140 @@ export const api = {
     if (token) params.append('token', token);
     const qs = params.toString();
     return `${API_BASE}/reports/csv${qs ? `?${qs}` : ''}`;
+  },
+
+  // ─── STANDARD SOC OPERATIONS APIS ─────────────────────────
+  async getSocMetrics(): Promise<SocMetrics> {
+    const res = await fetch(`${API_BASE}/soc/metrics`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getSocCases(filters?: { severity?: string; tier?: string; status?: string; systemId?: string }): Promise<{ cases: SocCase[]; total: number }> {
+    const params = new URLSearchParams();
+    if (filters?.severity) params.append('severity', filters.severity);
+    if (filters?.tier) params.append('tier', filters.tier);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.systemId) params.append('systemId', filters.systemId);
+    const res = await fetch(`${API_BASE}/soc/cases?${params.toString()}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async addSocCaseNote(id: string, text: string, author?: string, authorRole?: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/soc/cases/${encodeURIComponent(id)}/notes`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ text, author, authorRole }),
+    });
+    return res.json();
+  },
+
+  async updateSocCaseStatus(id: string, status: string): Promise<SocCase> {
+    const res = await fetch(`${API_BASE}/soc/cases/${encodeURIComponent(id)}/status`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ status }),
+    });
+    return res.json();
+  },
+
+  async assignSocCase(id: string, analyst: string, tier?: string): Promise<SocCase> {
+    const res = await fetch(`${API_BASE}/soc/cases/${encodeURIComponent(id)}/assign`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ analyst, tier }),
+    });
+    return res.json();
+  },
+
+  async getSocBlocklist(): Promise<{ blocklist: IpBlocklistEntry[]; total: number }> {
+    const res = await fetch(`${API_BASE}/soc/blocklist`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async blockIp(data: { ip: string; reason: string; threatClassification?: string; systemId?: string; durationHours?: number }): Promise<IpBlocklistEntry> {
+    const res = await fetch(`${API_BASE}/soc/blocklist`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async unblockIp(ip: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/soc/blocklist/${encodeURIComponent(ip)}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async getSocIocs(): Promise<{ iocs: IocEntry[]; total: number }> {
+    const res = await fetch(`${API_BASE}/soc/iocs`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async addSocIoc(data: Partial<IocEntry>): Promise<IocEntry> {
+    const res = await fetch(`${API_BASE}/soc/iocs`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  },
+
+  async getSocPlaybooks(): Promise<{ playbooks: SocPlaybook[] }> {
+    const res = await fetch(`${API_BASE}/soc/playbooks`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async executeSocPlaybook(id: string, targetCaseId?: string): Promise<{ success: boolean; playbook: SocPlaybook; actionsTaken: string[] }> {
+    const res = await fetch(`${API_BASE}/soc/playbooks/${encodeURIComponent(id)}/execute`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ targetCaseId }),
+    });
+    return res.json();
+  },
+
+  async getSocRules(): Promise<{ rules: DetectionRule[] }> {
+    const res = await fetch(`${API_BASE}/soc/rules`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async toggleSocRule(id: string, enabled: boolean): Promise<DetectionRule> {
+    const res = await fetch(`${API_BASE}/soc/rules/${encodeURIComponent(id)}/toggle`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ enabled }),
+    });
+    return res.json();
+  },
+
+  async getSocShifts(): Promise<{ handovers: ShiftHandover[] }> {
+    const res = await fetch(`${API_BASE}/soc/shifts`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
+  async createSocShift(data: { shiftName: string; leadAnalyst: string; analystsOnDuty?: string[]; handoffNotes: string; actionItems?: string[] }): Promise<ShiftHandover> {
+    const res = await fetch(`${API_BASE}/soc/shifts`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    return res.json();
   },
 };

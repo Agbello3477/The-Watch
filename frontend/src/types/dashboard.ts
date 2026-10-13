@@ -196,3 +196,132 @@ export interface UserAuditLogsResponse {
   logs: UserAuditLog[];
 }
 
+// ===================== SOC STANDARD OPERATIONS TYPES =====================
+export interface SocMetrics {
+  mttdSec: number;
+  mttrMin: number;
+  slaCompliancePercent: number;
+  openCasesCount: number;
+  p1CriticalCasesCount: number;
+  p2HighCasesCount: number;
+  activeBlocksCount: number;
+  activeIocsCount: number;
+  activePlaybooksCount: number;
+  activeRulesCount: number;
+  mitreDistribution: Record<string, number>;
+  timestampWat: string;
+}
+
+export interface SocCaseNote {
+  id: string;
+  author: string;
+  authorRole: string;
+  text: string;
+  createdAtWat: string;
+}
+
+export interface SocCase {
+  id: string;
+  incidentId?: string;
+  title: string;
+  systemId: string;
+  severity: 'P1' | 'P2' | 'P3' | 'P4';
+  tier: 'TIER_1' | 'TIER_2' | 'TIER_3';
+  assignedAnalyst: string;
+  status: 'TRIAGE' | 'INVESTIGATING' | 'CONTAINED' | 'RESOLVED' | 'CLOSED';
+  slaDeadlineWat: string;
+  isSlaBreached: boolean;
+  mitreTactic: string;
+  mitreTechnique: string;
+  offendingIp: string;
+  targetEndpoint: string;
+  capturedPayload: string;
+  containmentStatus: 'UNCONTAINED' | 'IP_BLOCKED' | 'HOST_ISOLATED' | 'SESSIONS_REVOKED';
+  notes: SocCaseNote[];
+  containmentActions: string[];
+  createdAtWat: string;
+  resolvedAtWat?: string;
+  timeToDetectSec: number;
+  timeToResolveMin?: number;
+}
+
+export interface IpBlocklistEntry {
+  id: string;
+  ip: string;
+  reason: string;
+  threatClassification: string;
+  systemId: string;
+  blockedBy: string;
+  blockedAtWat: string;
+  expiresAtWat: string;
+  status: 'ACTIVE' | 'REVOKED';
+  requestCountBlocked: number;
+}
+
+export interface IocEntry {
+  id: string;
+  type: 'IP' | 'DOMAIN' | 'HASH_SHA256' | 'REGEX_SIGNATURE' | 'USER_AGENT';
+  value: string;
+  threatActor?: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  confidence: number;
+  mitreTactic: string;
+  mitreTechnique: string;
+  tags: string[];
+  addedBy: string;
+  firstSeenWat: string;
+  lastSeenWat: string;
+  status: 'ACTIVE' | 'WHITELISTED';
+}
+
+export interface PlaybookStep {
+  id: string;
+  order: number;
+  title: string;
+  description: string;
+  actionType: 'BLOCK_IP' | 'REVOKE_SESSIONS' | 'NOTIFY_LEAD' | 'GENERATE_REPORT' | 'ISOLATE_HOST';
+  automated: boolean;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'SKIPPED';
+  executedAtWat?: string;
+}
+
+export interface SocPlaybook {
+  id: string;
+  name: string;
+  description: string;
+  triggerEvent: string;
+  mitreTactic: string;
+  mitreTechnique: string;
+  steps: PlaybookStep[];
+  executionCount: number;
+  lastRunWat?: string;
+}
+
+export interface DetectionRule {
+  id: string;
+  name: string;
+  category: 'INJECTION' | 'CREDENTIAL_ACCESS' | 'DENIAL_OF_SERVICE' | 'EXFILTRATION' | 'ANOMALY';
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  mitreTactic: string;
+  mitreTechnique: string;
+  queryPattern: string;
+  enabled: boolean;
+  triggerCount: number;
+  lastTriggeredWat?: string;
+  description: string;
+}
+
+export interface ShiftHandover {
+  id: string;
+  shiftName: string;
+  leadAnalyst: string;
+  analystsOnDuty: string[];
+  unresolvedP1P2Count: number;
+  activeContainmentsCount: number;
+  handoffNotes: string;
+  actionItems: string[];
+  handoverTimestampWat: string;
+  status: 'ACTIVE' | 'ARCHIVED';
+}
+
+

@@ -13,6 +13,7 @@ import { LandingHome } from './components/LandingHome';
 import { LoginModal } from './components/LoginModal';
 import { UserManagement } from './components/UserManagement';
 import { ConnectionPanel } from './components/ConnectionPanel';
+import { SocCommandCenter } from './components/SocCommandCenter';
 import { api, authStorage } from './services/api';
 import {
   SystemOverview,
@@ -23,12 +24,12 @@ import {
   AdvisorResponse,
   AuthSessionUser,
 } from './types/dashboard';
-import { Globe, Activity, Sparkles, FileText, Flame, Users, ShieldCheck } from 'lucide-react';
+import { Globe, Activity, Sparkles, FileText, Flame, Users, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [selectedSystem, setSelectedSystem] = useState<string>('');
   const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'users'>('home');
-  const [activeSocTab, setActiveSocTab] = useState<'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'traffic' | 'connect'>('threats');
+  const [activeSocTab, setActiveSocTab] = useState<'soc' | 'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'traffic' | 'connect'>('soc');
   
   // Auth state
   const [currentUser, setCurrentUser] = useState<AuthSessionUser | null>(authStorage.getUser());
@@ -198,6 +199,21 @@ export const App: React.FC = () => {
               <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 shrink-0">
                 
                 <button
+                  onClick={() => setActiveSocTab('soc')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                    activeSocTab === 'soc'
+                      ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg shadow-red-600/30'
+                      : 'text-red-400 hover:text-red-300 hover:bg-slate-800/60'
+                  }`}
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 animate-pulse" />
+                  <span>SOC War Room & Ops</span>
+                  <span className="bg-red-950 text-red-300 border border-red-800 text-[10px] font-mono px-1.5 py-0.2 rounded-full">
+                    LIVE
+                  </span>
+                </button>
+
+                <button
                   onClick={() => setActiveSocTab('threats')}
                   className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                     activeSocTab === 'threats'
@@ -294,6 +310,15 @@ export const App: React.FC = () => {
             </div>
 
             {/* Tab Content Panes */}
+            {activeSocTab === 'soc' && (
+              <div className="space-y-6">
+                <SocCommandCenter
+                  currentUser={currentUser}
+                  selectedSystem={selectedSystem}
+                />
+              </div>
+            )}
+
             {activeSocTab === 'threats' && (
               <div className="space-y-6">
                 <ThreatMap nodes={threatNodes} />

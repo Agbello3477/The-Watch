@@ -66,7 +66,12 @@ tenantsRouter.get('/:systemId/sdk-config', (req: Request, res: Response) => {
     return;
   }
 
-  const watchUrl = process.env.THE_WATCH_PUBLIC_URL || `http://localhost:${process.env.PORT || 4000}`;
+  const host = req.get('x-forwarded-host') || req.get('host');
+  const proto = req.get('x-forwarded-proto') || (req.secure ? 'https' : req.protocol);
+  const requestUrl = host ? `${proto}://${host}` : `http://localhost:${process.env.PORT || 4000}`;
+  const watchUrl = process.env.THE_WATCH_PUBLIC_URL 
+    || process.env.RENDER_EXTERNAL_URL 
+    || requestUrl;
 
   res.json({
     systemId,

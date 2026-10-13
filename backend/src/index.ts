@@ -20,6 +20,7 @@ import { authRouter } from './routes/auth';
 import { usersRouter } from './routes/users';
 import { tenantsRouter } from './routes/tenants';
 import { trafficRouter } from './routes/traffic.js';
+import { socRouter } from './routes/soc';
 import { ingestQueue } from './ingest/ingest-queue';
 
 export const app = express();
@@ -83,6 +84,7 @@ app.use('/api/v1/advisor', advisorRouter);
 app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/simulation', simulationRouter);
 app.use('/api/v1/traffic', trafficRouter);
+app.use('/api/v1/soc', socRouter);
 
 // Root health check
 app.get('/health', (req, res) => {

@@ -280,8 +280,33 @@ class DatabaseManager {
 
     // 3. Seed Tenants
     for (const [key, tenant] of Object.entries(REGISTERED_TENANTS)) {
+      const tenantId = `tenant-${tenant.systemId.toLowerCase()}`;
+      if (this.isPostgresConnected && this.pgPool) {
+        try {
+          await this.pgPool.query(
+            `INSERT INTO tenants (id, system_id, name, api_key, api_secret, primary_contact, enabled)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (system_id) DO UPDATE SET 
+               api_key = EXCLUDED.api_key,
+               api_secret = EXCLUDED.api_secret,
+               enabled = EXCLUDED.enabled`,
+            [
+              tenantId,
+              tenant.systemId,
+              tenant.name,
+              tenant.apiKey,
+              tenant.apiSecret,
+              tenant.primaryContact,
+              tenant.enabled,
+            ]
+          );
+        } catch (e) {
+          console.warn('[DB Seed Tenants Notice]:', (e as any)?.message);
+        }
+      }
+
       this.memoryStore.tenants.set(tenant.systemId, {
-        id: `tenant-${tenant.systemId.toLowerCase()}`,
+        id: tenantId,
         system_id: tenant.systemId,
         name: tenant.name,
         api_key: tenant.apiKey,
@@ -535,12 +560,43 @@ class DatabaseManager {
     if (this.isPostgresConnected && this.pgPool) {
       try {
         const res = await this.pgPool.query('SELECT * FROM tenants WHERE api_key = $1 AND enabled = true', [apiKey]);
-        return res.rows[0] || null;
+        if (res.rows[0]) return res.rows[0];
       } catch (e) {}
     }
     for (const tenant of this.memoryStore.tenants.values()) {
       if (tenant.api_key === apiKey && tenant.enabled) {
         return tenant;
+      }
+    }
+    // Fallback to REGISTERED_TENANTS with Postgres auto-heal
+    for (const tenant of Object.values(REGISTERED_TENANTS)) {
+      if (tenant.apiKey === apiKey && tenant.enabled) {
+        const tenantObj = {
+          id: `tenant-${tenant.systemId.toLowerCase()}`,
+          system_id: tenant.systemId,
+          name: tenant.name,
+          api_key: tenant.apiKey,
+          api_secret: tenant.apiSecret,
+          primary_contact: tenant.primaryContact,
+          enabled: tenant.enabled,
+        };
+        if (this.isPostgresConnected && this.pgPool) {
+          this.pgPool.query(
+            `INSERT INTO tenants (id, system_id, name, api_key, api_secret, primary_contact, enabled)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (system_id) DO UPDATE SET api_key = EXCLUDED.api_key, enabled = EXCLUDED.enabled`,
+            [
+              tenantObj.id,
+              tenantObj.system_id,
+              tenantObj.name,
+              tenantObj.api_key,
+              tenantObj.api_secret,
+              tenantObj.primary_contact,
+              tenantObj.enabled,
+            ]
+          ).catch(() => {});
+        }
+        return tenantObj;
       }
     }
     return null;
@@ -550,10 +606,25 @@ class DatabaseManager {
     if (this.isPostgresConnected && this.pgPool) {
       try {
         const res = await this.pgPool.query('SELECT * FROM tenants WHERE system_id = $1', [systemId]);
-        return res.rows[0] || null;
+        if (res.rows[0]) return res.rows[0];
       } catch (e) {}
     }
-    return this.memoryStore.tenants.get(systemId) || null;
+    const mem = this.memoryStore.tenants.get(systemId);
+    if (mem) return mem;
+
+    const reg = REGISTERED_TENANTS[systemId];
+    if (reg) {
+      return {
+        id: `tenant-${reg.systemId.toLowerCase()}`,
+        system_id: reg.systemId,
+        name: reg.name,
+        api_key: reg.apiKey,
+        api_secret: reg.apiSecret,
+        primary_contact: reg.primaryContact,
+        enabled: reg.enabled,
+      };
+    }
+    return null;
   }
 
   public async getAllTenants(): Promise<any[]> {
