@@ -10,6 +10,7 @@ import {
   Clock,
   MapPin,
   Flame,
+  RefreshCw,
 } from 'lucide-react';
 import { ThreatIncident } from '../types/dashboard';
 
@@ -22,6 +23,19 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
   const [selectedIncident, setSelectedIncident] = useState<ThreatIncident | null>(null);
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
+
+  const handleAction = async (e: React.MouseEvent, id: string, status: 'ACKNOWLEDGED' | 'RESOLVED') => {
+    e.stopPropagation();
+    setLoadingActionId(id);
+    try {
+      await onUpdateStatus(id, status);
+    } catch (err) {
+      console.error('[IncidentFeed] Action failed:', err);
+    } finally {
+      setLoadingActionId(null);
+    }
+  };
 
   const filteredIncidents = incidents.filter((inc) => {
     if (severityFilter !== 'ALL' && inc.severity !== severityFilter) return false;
@@ -172,22 +186,38 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
 
                       {inc.status === 'UNRESOLVED' && (
                         <button
-                          onClick={() => onUpdateStatus(inc.id, 'ACKNOWLEDGED')}
+                          onClick={(e) => handleAction(e, inc.id, 'ACKNOWLEDGED')}
+                          disabled={loadingActionId === inc.id}
                           title="Acknowledge Incident"
-                          className="px-2 py-1 rounded bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/40 text-[10px] font-bold transition"
+                          className="px-2.5 py-1 rounded bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/40 text-[10px] font-bold transition flex items-center gap-1 disabled:opacity-50"
                         >
-                          Ack
+                          {loadingActionId === inc.id ? (
+                            <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                          ) : null}
+                          <span>Ack</span>
                         </button>
                       )}
 
-                      {inc.status !== 'RESOLVED' && (
+                      {inc.status !== 'RESOLVED' ? (
                         <button
-                          onClick={() => onUpdateStatus(inc.id, 'RESOLVED')}
+                          onClick={(e) => handleAction(e, inc.id, 'RESOLVED')}
+                          disabled={loadingActionId === inc.id}
                           title="Resolve Incident"
-                          className="px-2 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold transition"
+                          className="px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold transition flex items-center gap-1 disabled:opacity-50"
                         >
-                          Resolve
+                          {loadingActionId === inc.id ? (
+                            <>
+                              <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                              <span>Resolving...</span>
+                            </>
+                          ) : (
+                            <span>Resolve</span>
+                          )}
                         </button>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-mono flex items-center gap-1">
+                          <Check className="w-3 h-3 text-emerald-400" /> Resolved
+                        </span>
                       )}
                     </div>
                   </td>
@@ -261,13 +291,21 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
             <div className="mt-6 pt-4 border-t border-slate-800 flex justify-end gap-2">
               {selectedIncident.status !== 'RESOLVED' && (
                 <button
-                  onClick={async () => {
-                    await onUpdateStatus(selectedIncident.id, 'RESOLVED');
+                  disabled={loadingActionId === selectedIncident.id}
+                  onClick={async (e) => {
+                    await handleAction(e, selectedIncident.id, 'RESOLVED');
                     setSelectedIncident(null);
                   }}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs transition"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs transition flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  Mark as Resolved
+                  {loadingActionId === selectedIncident.id ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Resolving Incident...</span>
+                    </>
+                  ) : (
+                    <span>Mark as Resolved</span>
+                  )}
                 </button>
               )}
               <button

@@ -801,6 +801,15 @@ class DatabaseManager {
   ): Promise<ThreatIncident | null> {
     const resolvedAt = status === 'RESOLVED' ? new Date().toISOString() : undefined;
 
+    // 1. Always update in memory store
+    const memInc = this.memoryStore.threatIncidents.find((i) => i.id === id);
+    if (memInc) {
+      memInc.status = status;
+      memInc.acknowledged_by = adminUser;
+      if (resolvedAt) memInc.resolved_at = resolvedAt;
+    }
+
+    // 2. If Postgres connected, update or upsert in Postgres
     if (this.isPostgresConnected && this.pgPool) {
       try {
         const res = await this.pgPool.query(
@@ -809,18 +818,49 @@ class DatabaseManager {
            WHERE id = $4 RETURNING *`,
           [status, adminUser, resolvedAt || null, id]
         );
-        if (res.rows.length > 0) return res.rows[0];
-      } catch (e) {}
+        if (res.rows.length > 0) {
+          return res.rows[0];
+        } else if (memInc) {
+          // If in memoryStore but not yet in Postgres, insert it
+          await this.pgPool.query(
+            `INSERT INTO threat_incidents 
+             (id, system_id, incident_type, threat_classification, severity, offending_ip, geo_country, geo_region, geo_city, geo_lat, geo_lng, asn, isp, is_proxy_or_vpn, target_endpoint, http_method, captured_payload, status, mitigation_blueprint, remediation_summary, created_at_wat, created_at, acknowledged_by, resolved_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+             ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, acknowledged_by = EXCLUDED.acknowledged_by, resolved_at = EXCLUDED.resolved_at`,
+            [
+              memInc.id,
+              memInc.system_id,
+              memInc.incident_type,
+              memInc.threat_classification,
+              memInc.severity,
+              memInc.offending_ip,
+              memInc.geo_country,
+              memInc.geo_region,
+              memInc.geo_city,
+              memInc.geo_lat,
+              memInc.geo_lng,
+              memInc.asn,
+              memInc.isp,
+              memInc.is_proxy_or_vpn,
+              memInc.target_endpoint,
+              memInc.http_method,
+              memInc.captured_payload,
+              status,
+              memInc.mitigation_blueprint,
+              memInc.remediation_summary || null,
+              memInc.created_at_wat,
+              memInc.created_at || new Date().toISOString(),
+              adminUser,
+              resolvedAt || null,
+            ]
+          );
+        }
+      } catch (e) {
+        console.warn('[DB updateIncidentStatus Notice]:', (e as any)?.message);
+      }
     }
 
-    const inc = this.memoryStore.threatIncidents.find((i) => i.id === id);
-    if (inc) {
-      inc.status = status;
-      inc.acknowledged_by = adminUser;
-      if (resolvedAt) inc.resolved_at = resolvedAt;
-      return inc;
-    }
-    return null;
+    return memInc || null;
   }
 
   // ===================== SYNTHETIC PROBES =====================

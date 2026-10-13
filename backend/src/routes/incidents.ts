@@ -22,7 +22,7 @@ incidentsRouter.get('/', async (req: Request, res: Response) => {
 /**
  * Update incident status (Acknowledge or Resolve)
  */
-incidentsRouter.patch('/:id/status', async (req: Request, res: Response) => {
+const updateIncidentStatusHandler = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { status, adminUser } = req.body;
 
@@ -38,4 +38,7 @@ incidentsRouter.patch('/:id/status', async (req: Request, res: Response) => {
   }
 
   res.json(updated);
-});
+};
+
+incidentsRouter.patch('/:id/status', updateIncidentStatusHandler);
+incidentsRouter.post('/:id/status', updateIncidentStatusHandler);

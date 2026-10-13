@@ -27,7 +27,7 @@ export const app = express();
 
 app.use(cors({
   origin: '*', // Allow HRMS and any other registered system to call ingest
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Telemetry-Key', 'X-Telemetry-Signature'],
 }));
 app.use(express.json({ limit: '5mb' }));

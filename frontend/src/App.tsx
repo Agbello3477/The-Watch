@@ -108,7 +108,24 @@ export const App: React.FC = () => {
   }, [fetchData, autoRefreshInterval, currentView]);
 
   const handleUpdateIncidentStatus = async (id: string, status: 'ACKNOWLEDGED' | 'RESOLVED') => {
-    await api.updateIncidentStatus(id, status);
+    // 1. Immediate optimistic UI update
+    setIncidents((prev) =>
+      prev.map((inc) => (inc.id === id ? { ...inc, status } : inc))
+    );
+    setOverview((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        unresolvedIncidents: Math.max(0, prev.unresolvedIncidents - (status === 'RESOLVED' ? 1 : 0)),
+      };
+    });
+
+    try {
+      await api.updateIncidentStatus(id, status);
+    } catch (err) {
+      console.error('[Incident] Failed to update status on server:', err);
+    }
+
     await fetchData();
   };
 

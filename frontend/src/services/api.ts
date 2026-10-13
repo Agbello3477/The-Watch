@@ -184,12 +184,25 @@ export const api = {
   async updateIncidentStatus(id: string, status: 'ACKNOWLEDGED' | 'RESOLVED'): Promise<ThreatIncident> {
     const user = authStorage.getUser();
     const adminUser = user ? `${user.fullName} (${user.role})` : 'Lead-SOC-Analyst';
-    const res = await fetch(`${API_BASE}/incidents/${id}/status`, {
-      method: 'PATCH',
+    try {
+      const res = await fetch(`${API_BASE}/incidents/${id}/status`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status, adminUser }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('[API] PATCH /incidents/:id/status failed, attempting POST fallback:', e);
+    }
+
+    const postRes = await fetch(`${API_BASE}/incidents/${id}/status`, {
+      method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ status, adminUser }),
     });
-    return res.json();
+    return await postRes.json();
   },
 
   async getProbes(systemId?: string): Promise<SyntheticProbe[]> {
