@@ -74,25 +74,25 @@ export const Header: React.FC<HeaderProps> = ({
       case 'CRITICAL':
         return {
           label: 'CRITICAL',
-          badgeClass: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+          badgeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/40',
           dotClass: 'bg-rose-500 animate-pulse',
         };
       case 'SEVERE':
         return {
           label: 'SEVERE',
-          badgeClass: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
+          badgeClass: 'bg-orange-500/15 text-orange-400 border-orange-500/40',
           dotClass: 'bg-orange-500',
         };
       case 'ELEVATED':
         return {
           label: 'ELEVATED',
-          badgeClass: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+          badgeClass: 'bg-amber-500/15 text-amber-300 border-amber-500/40',
           dotClass: 'bg-amber-400 animate-ping-slow',
         };
       default:
         return {
           label: 'NORMAL',
-          badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+          badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40',
           dotClass: 'bg-emerald-400',
         };
     }
@@ -106,11 +106,15 @@ export const Header: React.FC<HeaderProps> = ({
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  // Strip "(Super Admin)" if accidentally embedded in fullName
+  const cleanDisplayName = currentUser?.fullName?.replace(/\s*\(Super Admin\)/i, '').trim() || 'Abdulgaffar Bello';
+  const roleDisplay = currentUser?.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : currentUser?.role || 'OPERATOR';
+
   return (
     <header className="bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-3 sm:px-6 py-2 transition-all w-full">
-      <div className="w-full max-w-[1600px] mx-auto flex items-center justify-between gap-2 sm:gap-4">
+      <div className="w-full flex items-center justify-between gap-2 sm:gap-3">
         
-        {/* ─── LEFT: Logo, Title & Tagline (Fixed, Never Shrinks) ─── */}
+        {/* ─── LEFT: Logo, Title & Tagline ─── */}
         <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
           <div 
             onClick={onGoHome}
@@ -147,8 +151,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* ─── CENTER: Clean High-Resolution Nav Bar ─── */}
-        <div className="hidden xl:flex items-center gap-2 shrink-0">
+        {/* ─── CENTER: High-Resolution Operations Bar ─── */}
+        <div className="hidden 2xl:flex items-center gap-2 shrink-0">
           {/* Segmented View Switcher */}
           <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
             <button
@@ -205,18 +209,18 @@ export const Header: React.FC<HeaderProps> = ({
             </select>
           </div>
 
-          {/* Clean Threat Pill */}
+          {/* Threat Pill */}
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-mono font-bold border shrink-0 ${threat.badgeClass}`}>
             <span className={`w-2 h-2 rounded-full ${threat.dotClass}`} />
             <span>THREAT: {threat.label}</span>
           </div>
         </div>
 
-        {/* ─── RIGHT: Controls & User Profile (Cleanly Flexed with no cutoffs) ─── */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        {/* ─── RIGHT: WAT Clock, Session Inactivity, Auto-Refresh & PROMINENT LOGOUT ─── */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           
-          {/* WAT Clock (Visible on md+) */}
-          <div className="hidden lg:flex items-center gap-1.5 bg-slate-950 border border-slate-800/80 px-2.5 py-1 rounded-xl text-[11px] font-mono text-slate-300 shrink-0">
+          {/* WAT Clock */}
+          <div className="hidden xl:flex items-center gap-1.5 bg-slate-950 border border-slate-800/80 px-2.5 py-1 rounded-xl text-[11px] font-mono text-slate-300 shrink-0">
             <Clock className="w-3.5 h-3.5 text-cyan-400" />
             <span>{watTime || 'WAT (UTC+1)'}</span>
           </div>
@@ -224,7 +228,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Session Inactivity Timeout Countdown */}
           {currentUser && typeof sessionTimeRemaining === 'number' && (
             <div 
-              title="Session inactivity timeout (3 mins). Activity resets timer."
+              title="Session inactivity timeout (3 mins). Any action resets timer."
               className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono border transition shrink-0 ${
                 sessionTimeRemaining <= 30
                   ? 'bg-rose-950/80 text-rose-300 border-rose-700/80 animate-pulse font-bold'
@@ -232,12 +236,12 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Timer className={`w-3.5 h-3.5 ${sessionTimeRemaining <= 30 ? 'text-rose-400' : 'text-slate-500'}`} />
-              <span className="hidden 2xl:inline text-[10px] uppercase text-slate-500">Timeout:</span>
+              <span className="hidden md:inline text-[10px] uppercase text-slate-500">Timeout:</span>
               <span className="font-semibold">{formatSessionTime(sessionTimeRemaining)}</span>
             </div>
           )}
 
-          {/* Auto-Refresh */}
+          {/* Telemetry Refresh Controls */}
           <div className="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded-xl p-0.5 shrink-0">
             <select
               value={autoRefreshInterval}
@@ -260,24 +264,27 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* User Profile Info & Sign Out */}
+          {/* ─── USER PROFILE & PROMINENT LOGOUT BUTTON ─── */}
           {currentUser ? (
-            <div className="flex items-center gap-2 pl-1.5 border-l border-slate-800 shrink-0">
-              <div className="text-right">
-                <div className="text-xs font-semibold text-slate-200 whitespace-nowrap">
-                  {currentUser.fullName}
-                </div>
-                <div className="text-[10px] text-cyan-400 font-mono font-bold whitespace-nowrap">
-                  {currentUser.role}
-                </div>
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-800 shrink-0">
+              {/* Stacked Name on Top & Role Below */}
+              <div className="text-right flex flex-col justify-center leading-tight">
+                <span className="text-xs font-bold text-white tracking-wide">
+                  {cleanDisplayName}
+                </span>
+                <span className="text-[10px] text-cyan-400 font-mono font-bold tracking-wider uppercase mt-0.5">
+                  {roleDisplay}
+                </span>
               </div>
 
+              {/* High-visibility Logout button with icon and label */}
               <button
                 onClick={onLogout}
-                title="Sign Out"
-                className="p-1.5 rounded-lg bg-slate-950 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 border border-slate-800 hover:border-rose-900/50 transition cursor-pointer shrink-0"
+                title="Sign Out of SOC Session"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 hover:text-white border border-rose-800/80 hover:border-rose-600 transition shadow-sm cursor-pointer shrink-0"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <span className="text-xs font-bold font-mono">Logout</span>
               </button>
             </div>
           ) : (
@@ -291,7 +298,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           {/* Mobile / Tablet Accordion Menu Toggle */}
-          <div className="flex xl:hidden shrink-0">
+          <div className="flex 2xl:hidden shrink-0">
             <button 
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
               className="p-1.5 rounded-lg bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
@@ -304,9 +311,9 @@ export const Header: React.FC<HeaderProps> = ({
 
       </div>
 
-      {/* ─── RESPONSIVE ACCORDION MENU (For widths < 1280px) ─── */}
+      {/* ─── RESPONSIVE ACCORDION MENU (For widths < 1536px) ─── */}
       {isMobileMenuOpen && (
-        <div className="xl:hidden mt-2.5 pt-2.5 border-t border-slate-800 space-y-2.5 animate-fadeIn">
+        <div className="2xl:hidden mt-2.5 pt-2.5 border-t border-slate-800 space-y-2.5 animate-fadeIn">
           <div className="flex items-center justify-between">
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-mono font-bold border ${threat.badgeClass}`}>
               <span className={`w-2 h-2 rounded-full ${threat.dotClass}`} />
@@ -377,6 +384,22 @@ export const Header: React.FC<HeaderProps> = ({
               <option value="Security-Dispatch" className="bg-slate-900">Security-Dispatch (Campus)</option>
             </select>
           </div>
+
+          {/* Explicit mobile Logout button */}
+          {currentUser && (
+            <div className="pt-1 border-t border-slate-800/80">
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onLogout();
+                }}
+                className="w-full py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-bold flex items-center justify-center gap-2 transition"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sign Out ({cleanDisplayName})</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 

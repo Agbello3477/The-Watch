@@ -225,7 +225,7 @@ class DatabaseManager {
       email: superAdminEmail,
       password_hash: hash,
       salt,
-      full_name: 'Abdulgaffar Bello (Super Admin)',
+      full_name: 'Abdulgaffar Bello',
       role: 'SUPER_ADMIN',
       status: 'ACTIVE',
       allowed_systems: 'ALL',

@@ -59,8 +59,12 @@ export const App: React.FC = () => {
       if (authStorage.getToken()) {
         const res = await api.getMe();
         if (res.sessionValid && res.user) {
-          setCurrentUser(res.user);
-          authStorage.setUser(res.user);
+          const cleanUser = {
+            ...res.user,
+            fullName: res.user.fullName?.replace(/\s*\(Super Admin\)/i, '').trim() || 'Abdulgaffar Bello',
+          };
+          setCurrentUser(cleanUser);
+          authStorage.setUser(cleanUser);
         } else {
           setCurrentUser(null);
         }
@@ -180,7 +184,12 @@ export const App: React.FC = () => {
   };
 
   const handleLoginSuccess = (user: AuthSessionUser) => {
-    setCurrentUser(user);
+    const cleanUser = {
+      ...user,
+      fullName: user.fullName?.replace(/\s*\(Super Admin\)/i, '').trim() || 'Abdulgaffar Bello',
+    };
+    setCurrentUser(cleanUser);
+    authStorage.setUser(cleanUser);
     // If super admin, stay ready or navigate to SOC
     if (currentView === 'home') {
       setCurrentView('dashboard');
