@@ -48,6 +48,11 @@ export const App: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(5000);
 
+  // 3-Minute Session Inactivity Timeout (180 seconds)
+  const INACTIVITY_TIMEOUT_SECONDS = 180;
+  const [sessionTimeRemaining, setSessionTimeRemaining] = useState<number>(INACTIVITY_TIMEOUT_SECONDS);
+  const [sessionTimeoutNotice, setSessionTimeoutNotice] = useState<boolean>(false);
+
   // Validate active auth session on mount
   useEffect(() => {
     const verifySession = async () => {
@@ -63,6 +68,45 @@ export const App: React.FC = () => {
     };
     verifySession();
   }, []);
+
+  // Inactivity tracking: resets on any user interaction (mousemove, keydown, click, scroll, touchstart)
+  useEffect(() => {
+    if (!currentUser) {
+      setSessionTimeRemaining(INACTIVITY_TIMEOUT_SECONDS);
+      return;
+    }
+
+    let lastActivityTime = Date.now();
+
+    const handleUserActivity = () => {
+      lastActivityTime = Date.now();
+      setSessionTimeRemaining(INACTIVITY_TIMEOUT_SECONDS);
+    };
+
+    const activityEvents = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+    activityEvents.forEach((ev) => window.addEventListener(ev, handleUserActivity, { passive: true }));
+
+    // Tick every 1 second
+    const interval = setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - lastActivityTime) / 1000);
+      const remaining = Math.max(0, INACTIVITY_TIMEOUT_SECONDS - elapsedSeconds);
+      setSessionTimeRemaining(remaining);
+
+      if (remaining === 0) {
+        // Automatically terminate session due to 3-minute inactivity
+        clearInterval(interval);
+        api.logout().catch(() => {});
+        setCurrentUser(null);
+        setCurrentView('home');
+        setSessionTimeoutNotice(true);
+      }
+    }, 1000);
+
+    return () => {
+      activityEvents.forEach((ev) => window.removeEventListener(ev, handleUserActivity));
+      clearInterval(interval);
+    };
+  }, [currentUser]);
 
   const fetchData = useCallback(async () => {
     if (currentView === 'home') return; // Don't aggressively poll when on home view
@@ -186,6 +230,34 @@ export const App: React.FC = () => {
           onClose={() => setIsLoginModalOpen(false)}
           onLoginSuccess={handleLoginSuccess}
         />
+
+        {/* 3-Minute Session Inactivity Timeout Notification Modal */}
+        {sessionTimeoutNotice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
+            <div className="relative w-full max-w-sm bg-slate-900 border border-amber-500/50 rounded-2xl p-6 shadow-2xl shadow-amber-950/60 text-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+                <ShieldAlert className="w-6 h-6 animate-pulse" />
+              </div>
+
+              <div>
+                <h3 className="text-base font-bold text-white">Session Timed Out</h3>
+                <p className="text-xs text-slate-300 mt-1 font-mono">
+                  For security compliance, your active session was terminated following 3 minutes of inactivity.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setSessionTimeoutNotice(false);
+                  setIsLoginModalOpen(true);
+                }}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs transition shadow-lg shadow-cyan-500/25 cursor-pointer"
+              >
+                Sign In Again
+              </button>
+            </div>
+          </div>
+        )}
       </>
     );
   }
@@ -208,6 +280,7 @@ export const App: React.FC = () => {
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onLogout={handleLogout}
         onGoHome={() => setCurrentView('home')}
+        sessionTimeRemaining={sessionTimeRemaining}
       />
 
       {/* Main Content Area */}
@@ -434,6 +507,34 @@ export const App: React.FC = () => {
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
       />
+
+      {/* 3-Minute Session Inactivity Timeout Notification Modal */}
+      {sessionTimeoutNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
+          <div className="relative w-full max-w-sm bg-slate-900 border border-amber-500/50 rounded-2xl p-6 shadow-2xl shadow-amber-950/60 text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+              <ShieldAlert className="w-6 h-6 animate-pulse" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-white">Session Timed Out</h3>
+              <p className="text-xs text-slate-300 mt-1 font-mono">
+                For security compliance, your active session was terminated following 3 minutes of inactivity.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setSessionTimeoutNotice(false);
+                setIsLoginModalOpen(true);
+              }}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs transition shadow-lg shadow-cyan-500/25 cursor-pointer"
+            >
+              Sign In Again
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

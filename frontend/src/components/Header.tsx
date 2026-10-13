@@ -1,6 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Menu, X as XIcon } from 'lucide-react';
-import { Clock, Layers, RefreshCw, User, LogOut, KeyRound, Home, Users, ShieldCheck } from 'lucide-react';
+import { 
+  Clock, 
+  Layers, 
+  RefreshCw, 
+  LogOut, 
+  KeyRound, 
+  Home, 
+  Users, 
+  ShieldCheck, 
+  Menu, 
+  X as XIcon,
+  Timer
+} from 'lucide-react';
 import { SystemOverview, AuthSessionUser } from '../types/dashboard';
 
 interface HeaderProps {
@@ -17,6 +28,7 @@ interface HeaderProps {
   onOpenLogin: () => void;
   onLogout: () => void;
   onGoHome: () => void;
+  sessionTimeRemaining?: number | null; // Seconds remaining in active session
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenLogin,
   onLogout,
   onGoHome,
+  sessionTimeRemaining,
 }) => {
   const [watTime, setWatTime] = useState<string>('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -59,70 +72,93 @@ export const Header: React.FC<HeaderProps> = ({
     const level = overview?.threatLevel || 'NORMAL';
     switch (level) {
       case 'CRITICAL':
-        return <span className="bg-red-500/20 text-red-400 border border-red-500/40 px-3 py-1 rounded-full text-xs font-bold tracking-wide flex items-center gap-1.5 animate-pulse"><span className="w-2 h-2 rounded-full bg-red-500"></span>THREAT LEVEL: CRITICAL</span>;
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold tracking-wide font-mono bg-rose-500/15 text-rose-400 border border-rose-500/30 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            <span>THREAT: CRITICAL</span>
+          </span>
+        );
       case 'SEVERE':
-        return <span className="bg-orange-500/20 text-orange-400 border border-orange-500/40 px-3 py-1 rounded-full text-xs font-bold tracking-wide flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-orange-500"></span>THREAT LEVEL: SEVERE</span>;
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold tracking-wide font-mono bg-orange-500/15 text-orange-400 border border-orange-500/30 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-orange-500" />
+            <span>THREAT: SEVERE</span>
+          </span>
+        );
       case 'ELEVATED':
-        return <span className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-3 py-1 rounded-full text-xs font-bold tracking-wide flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400"></span>THREAT LEVEL: ELEVATED</span>;
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold tracking-wide font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping-slow" />
+            <span>THREAT: ELEVATED</span>
+          </span>
+        );
       default:
-        return <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-3 py-1 rounded-full text-xs font-bold tracking-wide flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping-slow"></span>THREAT LEVEL: NORMAL</span>;
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold tracking-wide font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>THREAT: NORMAL</span>
+          </span>
+        );
     }
   };
 
+  const formatSessionTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
   return (
-    <header className="bg-slate-900/90 backdrop-blur border-b border-slate-800 sticky top-0 z-40 px-6 py-3 transition-all">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+    <header className="bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 sm:px-6 py-2.5 transition-all">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
         
-        {/* Brand & Logo */}
-        <div className="flex items-center gap-3.5">
+        {/* ─── LEFT: Logo & Platform Identity ─── */}
+        <div className="flex items-center gap-3 shrink-0">
           <div 
             onClick={onGoHome}
-            className="relative flex items-center justify-center w-11 h-11 rounded-xl bg-slate-950/80 p-1 shadow-lg shadow-cyan-500/10 border border-slate-700/80 overflow-hidden shrink-0 cursor-pointer hover:border-cyan-500 transition"
+            className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-slate-950 p-1 shadow-md shadow-cyan-500/10 border border-slate-700/80 overflow-hidden cursor-pointer hover:border-cyan-500 transition"
           >
             <img
               src="/logo.jpg"
               alt="The Watch Logo"
               className="w-full h-full object-contain rounded-lg"
             />
-            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
             </span>
           </div>
+
           <div>
             <div className="flex items-center gap-2">
               <h1 
                 onClick={onGoHome}
-                className="text-lg font-black tracking-wider text-white cursor-pointer hover:text-cyan-400 transition"
+                className="text-base font-black tracking-wider text-white cursor-pointer hover:text-cyan-400 transition"
               >
                 THE WATCH
               </h1>
-              <span className="text-[9px] uppercase font-mono font-bold tracking-widest bg-cyan-950 text-cyan-400 border border-cyan-800 px-1.5 py-0.5 rounded">
+              <span className="text-[9px] uppercase font-mono font-bold tracking-wider bg-cyan-950/80 text-cyan-400 border border-cyan-800/80 px-1.5 py-0.5 rounded">
                 v2.4 SOC
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-              <span>Observability & Threat Gateway</span>
-              <span className="text-slate-600">•</span>
-              <span className="text-cyan-400/90 font-mono text-[10px]">Zero Host Overhead</span>
+            <p className="text-[10.5px] text-slate-400 flex items-center gap-1.5 font-mono">
+              <span className="truncate max-w-[150px] sm:max-w-none">Observability & Threat Gateway</span>
+              <span className="text-slate-600 hidden sm:inline">•</span>
+              <span className="text-cyan-400/90 hidden sm:inline text-[9.5px]">Zero Host Overhead</span>
             </p>
           </div>
         </div>
 
-        {/* Mobile Menu Toggle */}
-        <div className="flex md:hidden items-center ml-auto">
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-400 hover:text-white">
-            {isMobileMenuOpen ? <XIcon className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
-
-        {/* Center Navigation & System Selector */}
-        <div className={`${isMobileMenuOpen ? 'flex' : 'hidden'} md:flex flex-col md:flex-row absolute md:static top-full left-0 right-0 bg-slate-900 md:bg-transparent border-b md:border-b-0 border-slate-800 p-4 md:p-0 items-start md:items-center gap-2.5`}>
-          <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl p-1">
+        {/* ─── CENTER: Clean Nav Tabs, Target Selector, Threat Badge (Desktop) ─── */}
+        <div className="hidden lg:flex items-center gap-2.5">
+          {/* View Segmented Tabs */}
+          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
             <button
               onClick={onGoHome}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
-                activeTab === 'home' ? 'bg-slate-800 text-cyan-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                activeTab === 'home' 
+                  ? 'bg-slate-800 text-cyan-400 font-bold shadow-sm' 
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Home className="w-3.5 h-3.5" />
@@ -131,8 +167,10 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={() => onTabChange('overview')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
-                activeTab !== 'home' && activeTab !== 'users' ? 'bg-slate-800 text-cyan-400 font-bold' : 'text-slate-400 hover:text-slate-200'
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                activeTab !== 'home' && activeTab !== 'users' 
+                  ? 'bg-slate-800 text-cyan-400 font-bold shadow-sm' 
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -142,8 +180,10 @@ export const Header: React.FC<HeaderProps> = ({
             {currentUser?.role === 'SUPER_ADMIN' && (
               <button
                 onClick={() => onTabChange('users')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
-                  activeTab === 'users' ? 'bg-indigo-950 text-indigo-300 font-bold border border-indigo-700/60' : 'text-slate-400 hover:text-slate-200'
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                  activeTab === 'users' 
+                    ? 'bg-indigo-950 text-indigo-300 font-bold border border-indigo-700/60 shadow-sm' 
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <Users className="w-3.5 h-3.5" />
@@ -152,12 +192,13 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1">
-            <Layers className="w-4 h-4 text-slate-400 ml-2 mr-1.5" />
+          {/* System Dropdown Selector */}
+          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1">
+            <Layers className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
             <select
               value={selectedSystem}
               onChange={(e) => onSelectSystem(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-slate-200 focus:outline-none pr-3 cursor-pointer py-1"
+              className="bg-transparent text-xs font-medium text-slate-200 focus:outline-none cursor-pointer pr-1"
             >
               <option value="" className="bg-slate-900 text-slate-100">All Systems (Universal)</option>
               <option value="NOUN-HRMS" className="bg-slate-900 text-slate-100">NOUN-HRMS (Flagship)</option>
@@ -166,44 +207,66 @@ export const Header: React.FC<HeaderProps> = ({
             </select>
           </div>
 
+          {/* Threat Badge */}
           {getThreatBadge()}
         </div>
 
-        {/* Right Controls: WAT Clock & User Profile / Login */}
-        <div className="flex items-center gap-3">
-          <div className="hidden xl:flex items-center gap-1.5 bg-slate-950/80 border border-slate-800/80 px-2.5 py-1.5 rounded-xl text-[11px] font-mono text-slate-300">
+        {/* ─── RIGHT: WAT Clock, Session Inactivity Counter, Auto-Refresh & User Profile ─── */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          
+          {/* WAT Master Clock */}
+          <div className="hidden md:flex items-center gap-1.5 bg-slate-950 border border-slate-800/80 px-2.5 py-1 rounded-xl text-[11px] font-mono text-slate-300 shrink-0">
             <Clock className="w-3.5 h-3.5 text-cyan-400" />
             <span>{watTime || 'WAT (UTC+1)'}</span>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          {/* Active Session Inactivity Countdown (Visible when logged in) */}
+          {currentUser && typeof sessionTimeRemaining === 'number' && (
+            <div 
+              title="Session inactivity timeout (3 mins). Any mouse movement or keystroke resets timer."
+              className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-mono border transition ${
+                sessionTimeRemaining <= 30
+                  ? 'bg-rose-950/70 text-rose-300 border-rose-700/80 animate-pulse font-bold'
+                  : 'bg-slate-950 text-slate-400 border-slate-800'
+              }`}
+            >
+              <Timer className={`w-3.5 h-3.5 ${sessionTimeRemaining <= 30 ? 'text-rose-400' : 'text-slate-500'}`} />
+              <span className="hidden xl:inline text-[10px] uppercase text-slate-500">Timeout:</span>
+              <span className="font-semibold">{formatSessionTime(sessionTimeRemaining)}</span>
+            </div>
+          )}
+
+          {/* Telemetry Refresh Controls */}
+          <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl p-0.5">
             <select
               value={autoRefreshInterval}
               onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
-              className="bg-slate-950 border border-slate-800 text-[11px] text-slate-400 rounded-lg px-2 py-1.5 focus:outline-none cursor-pointer"
+              className="bg-transparent text-[11px] font-mono text-slate-400 px-2 py-1 focus:outline-none cursor-pointer"
             >
-              <option value={5000}>5s</option>
-              <option value={10000}>10s</option>
-              <option value={30000}>30s</option>
-              <option value={0}>Manual</option>
+              <option value={5000} className="bg-slate-900">5s</option>
+              <option value={10000} className="bg-slate-900">10s</option>
+              <option value={30000} className="bg-slate-900">30s</option>
+              <option value={0} className="bg-slate-900">Off</option>
             </select>
 
             <button
               onClick={onRefresh}
               disabled={isRefreshing}
               title="Refresh telemetry"
-              className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-cyan-400' : ''}`} />
             </button>
           </div>
 
-          {/* User Profile or Sign In Button */}
+          {/* User Profile or Sign In */}
           {currentUser ? (
-            <div className="flex items-center space-x-2 pl-1 border-l border-slate-800">
+            <div className="flex items-center gap-2 pl-1 border-l border-slate-800">
               <div className="hidden sm:block text-right">
-                <div className="text-xs font-semibold text-slate-200">{currentUser.fullName}</div>
-                <div className="text-[10px] text-indigo-400 font-mono font-bold">
+                <div className="text-xs font-semibold text-slate-200 truncate max-w-[140px]">
+                  {currentUser.fullName}
+                </div>
+                <div className="text-[10px] text-cyan-400 font-mono font-bold">
                   {currentUser.role}
                 </div>
               </div>
@@ -211,7 +274,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onLogout}
                 title="Sign Out"
-                className="p-2 rounded-lg bg-slate-800/80 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-900/50 transition cursor-pointer"
+                className="p-1.5 rounded-lg bg-slate-950 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 border border-slate-800 hover:border-rose-900/50 transition cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>
@@ -219,15 +282,99 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <button
               onClick={onOpenLogin}
-              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs flex items-center space-x-1.5 shadow-md shadow-cyan-500/20 transition cursor-pointer"
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-md shadow-cyan-500/20 transition cursor-pointer shrink-0"
             >
               <KeyRound className="w-3.5 h-3.5" />
               <span>Sign In</span>
             </button>
           )}
+
+          {/* Mobile Menu Toggle Button */}
+          <div className="flex lg:hidden">
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+              className="p-1.5 rounded-lg bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
+            >
+              {isMobileMenuOpen ? <XIcon className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </button>
+          </div>
+
         </div>
 
       </div>
+
+      {/* ─── MOBILE ACCORDION MENU ─── */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden mt-3 pt-3 border-t border-slate-800 space-y-3">
+          <div className="flex items-center justify-between">
+            {getThreatBadge()}
+            <div className="text-xs font-mono text-cyan-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>{watTime}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => {
+                onGoHome();
+                setIsMobileMenuOpen(false);
+              }}
+              className={`p-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border ${
+                activeTab === 'home' 
+                  ? 'bg-slate-800 border-cyan-500 text-cyan-300' 
+                  : 'bg-slate-950 border-slate-800 text-slate-300'
+              }`}
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>Home</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onTabChange('overview');
+                setIsMobileMenuOpen(false);
+              }}
+              className={`p-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 border ${
+                activeTab !== 'home' && activeTab !== 'users' 
+                  ? 'bg-slate-800 border-cyan-500 text-cyan-300' 
+                  : 'bg-slate-950 border-slate-800 text-slate-300'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>SOC War Room</span>
+            </button>
+          </div>
+
+          {currentUser?.role === 'SUPER_ADMIN' && (
+            <button
+              onClick={() => {
+                onTabChange('users');
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full p-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 bg-indigo-950/60 border border-indigo-700/60 text-indigo-300"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>User Management Console</span>
+            </button>
+          )}
+
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-2 flex items-center">
+            <Layers className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+            <select
+              value={selectedSystem}
+              onChange={(e) => onSelectSystem(e.target.value)}
+              className="bg-transparent text-xs text-slate-200 focus:outline-none w-full"
+            >
+              <option value="" className="bg-slate-900">All Systems (Universal)</option>
+              <option value="NOUN-HRMS" className="bg-slate-900">NOUN-HRMS (Flagship)</option>
+              <option value="Clinic-EHR" className="bg-slate-900">Clinic-EHR (Medical)</option>
+              <option value="Security-Dispatch" className="bg-slate-900">Security-Dispatch (Campus)</option>
+            </select>
+          </div>
+        </div>
+      )}
+
     </header>
   );
 };

@@ -8,9 +8,6 @@ import {
   EyeOff, 
   AlertTriangle, 
   KeyRound, 
-  CheckCircle2, 
-  Sparkles,
-  Clock,
   ShieldAlert
 } from 'lucide-react';
 import { api } from '../services/api';
@@ -36,17 +33,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleFillSuperAdmin = () => {
-    setEmail('abdulgaffarbello3477@gmail.com');
-    setPassword('Agbello@3477');
-    setErrorMessage(null);
-    setErrorCode(null);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      setErrorMessage('Please provide both email and password.');
+      setErrorMessage('Please provide both institutional email and security password.');
       return;
     }
 
@@ -55,7 +45,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setErrorCode(null);
 
     try {
-      const response = await api.login({ email, password });
+      const response = await api.login({ email: email.trim(), password });
       if (response.success && response.user) {
         onLoginSuccess(response.user);
         onClose();
@@ -71,7 +61,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
       <div 
         className="relative w-full h-full sm:h-auto max-w-md bg-slate-900 border-0 sm:border border-cyan-800/60 rounded-none sm:rounded-2xl shadow-2xl shadow-cyan-950/80 overflow-hidden flex flex-col justify-center sm:block"
         onClick={(e) => e.stopPropagation()}
@@ -86,33 +76,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-100 text-base">Security Command Portal</h3>
-              <p className="text-[11px] text-slate-400 font-mono">SOC Multi-Factor Authentication</p>
+              <p className="text-[11px] text-slate-400 font-mono">Institutional Credentials Authentication</p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Quick-Fill Super Admin Banner */}
-        <div className="mx-6 mt-4 p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/50 flex items-center justify-between">
-          <div className="space-y-0.5">
-            <div className="text-xs font-semibold text-cyan-300 flex items-center space-x-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Super Admin Demo Preset</span>
-            </div>
-            <div className="text-[10px] text-slate-400 font-mono">abdulgaffarbello3477@gmail.com</div>
-          </div>
-          <button
-            type="button"
-            onClick={handleFillSuperAdmin}
-            className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition"
-          >
-            Fill Super Admin
           </button>
         </div>
 
@@ -133,7 +105,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <span className="font-semibold block">{errorMessage}</span>
                 {errorCode === 'ACCOUNT_LOCKED' && (
                   <span className="text-[10px] opacity-80 mt-1 block font-mono">
-                    Security Policy: Lockout automatically releases in 15 minutes.
+                    Security Policy: Account lockout automatically releases in 15 minutes.
                   </span>
                 )}
               </div>
@@ -152,9 +124,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               <input
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@institution.edu.ng"
+                placeholder="operator@noun.edu.ng"
                 className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 font-mono transition"
               />
             </div>
@@ -172,6 +145,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
@@ -180,7 +154,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300 transition"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-500 hover:text-slate-300 transition cursor-pointer"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -191,11 +165,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[10px] text-slate-400 space-y-1 font-mono">
             <div className="flex items-center space-x-1 text-slate-300 font-semibold">
               <KeyRound className="w-3 h-3 text-cyan-400" />
-              <span>Enterprise Security Protocol</span>
+              <span>Enterprise SOC Access Controls</span>
             </div>
-            <div>• PBKDF2 100,000 Iterations (SHA-512)</div>
-            <div>• Automatic 15-Minute Lockout after 5 Failures</div>
-            <div>• Real-time West Africa Time (WAT) Audit Trail</div>
+            <div>• PBKDF2 100,000 Iterations (SHA-512) Hash Encryption</div>
+            <div>• Inactivity Protection: Automatic 3-Minute Session Timeout</div>
+            <div>• Real-Time West Africa Time (WAT) Audit Logging</div>
           </div>
 
           {/* Submit button */}
