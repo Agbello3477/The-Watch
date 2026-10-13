@@ -12,6 +12,7 @@ import { TrafficMonitor } from './components/TrafficMonitor';
 import { LandingHome } from './components/LandingHome';
 import { LoginModal } from './components/LoginModal';
 import { UserManagement } from './components/UserManagement';
+import { ConnectionPanel } from './components/ConnectionPanel';
 import { api, authStorage } from './services/api';
 import {
   SystemOverview,
@@ -27,7 +28,7 @@ import { Globe, Activity, Sparkles, FileText, Flame, Users, ShieldCheck } from '
 export const App: React.FC = () => {
   const [selectedSystem, setSelectedSystem] = useState<string>('');
   const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'users'>('home');
-  const [activeSocTab, setActiveSocTab] = useState<'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'traffic'>('threats');
+  const [activeSocTab, setActiveSocTab] = useState<'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'traffic' | 'connect'>('threats');
   
   // Auth state
   const [currentUser, setCurrentUser] = useState<AuthSessionUser | null>(authStorage.getUser());
@@ -273,6 +274,18 @@ export const App: React.FC = () => {
                   <span>HRMS Traffic</span>
                 </button>
 
+                <button
+                  onClick={() => setActiveSocTab('connect')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                    activeSocTab === 'connect'
+                      ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
+                      : 'text-cyan-400 hover:text-cyan-300'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Connect Systems</span>
+                </button>
+
               </div>
 
               <span className="text-xs text-slate-500 font-mono hidden md:inline">
@@ -322,6 +335,12 @@ export const App: React.FC = () => {
             {activeSocTab === 'traffic' && (
               <div className="space-y-6">
                 <TrafficMonitor selectedSystem={selectedSystem || 'NOUN-HRMS'} />
+              </div>
+            )}
+
+            {activeSocTab === 'connect' && (
+              <div className="space-y-6">
+                <ConnectionPanel />
               </div>
             )}
           </>
