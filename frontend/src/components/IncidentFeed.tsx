@@ -11,6 +11,10 @@ import {
   MapPin,
   Flame,
   RefreshCw,
+  ShieldCheck,
+  Ban,
+  CheckCircle2,
+  X,
 } from 'lucide-react';
 import { ThreatIncident } from '../types/dashboard';
 
@@ -24,12 +28,38 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [loadingActionId, setLoadingActionId] = useState<string | null>(null);
+  const [neutralizedAlert, setNeutralizedAlert] = useState<{
+    id: string;
+    threatName: string;
+    ip: string;
+    actions: string[];
+  } | null>(null);
 
   const handleAction = async (e: React.MouseEvent, id: string, status: 'ACKNOWLEDGED' | 'RESOLVED') => {
     e.stopPropagation();
     setLoadingActionId(id);
     try {
       await onUpdateStatus(id, status);
+      if (status === 'RESOLVED') {
+        const inc = incidents.find((i) => i.id === id);
+        const actionsList: string[] = [];
+        if (inc?.offending_ip && inc.offending_ip !== '127.0.0.1') {
+          actionsList.push(`Quarantined IP ${inc.offending_ip} in Ingest Edge Firewall (HTTP 403 Drop Policy)`);
+        }
+        if (inc?.threat_classification.includes('Database Query') || inc?.incident_type === 'DATABASE_QUERY_REGRESSION') {
+          actionsList.push(`Applied Query Indexing Mitigation Blueprint to database pool`);
+        }
+        actionsList.push(`SLA Clock Stopped & Logged in West Africa Time (WAT)`);
+
+        setNeutralizedAlert({
+          id,
+          threatName: inc?.threat_classification || 'Security Incident',
+          ip: inc?.offending_ip || 'Origin IP',
+          actions: actionsList,
+        });
+
+        setTimeout(() => setNeutralizedAlert(null), 9000);
+      }
     } catch (err) {
       console.error('[IncidentFeed] Action failed:', err);
     } finally {
@@ -115,6 +145,46 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
           </div>
         </div>
       </div>
+
+      {/* Active Threat Neutralization Banner */}
+      {neutralizedAlert && (
+        <div className="mb-4 bg-emerald-950/80 border border-emerald-500/60 rounded-xl p-4 shadow-xl shadow-emerald-950/40 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 mt-0.5 shrink-0 border border-emerald-500/40">
+                <ShieldCheck className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-emerald-300 font-mono tracking-wide">
+                    THREAT NEUTRALIZED & CONTAINMENT ENFORCED
+                  </h4>
+                  <span className="text-[10px] font-mono bg-emerald-900/60 text-emerald-300 px-2 py-0.5 rounded border border-emerald-700">
+                    SOC DEFENSE ACTIVE
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1">
+                  Incident <span className="font-mono text-cyan-400 font-bold">{neutralizedAlert.id}</span> ({neutralizedAlert.threatName}) has been completely neutralized.
+                </p>
+                <div className="mt-2.5 space-y-1 bg-slate-950/60 border border-emerald-900/60 p-2.5 rounded-lg">
+                  {neutralizedAlert.actions.map((act, i) => (
+                    <div key={i} className="text-xs font-mono text-emerald-300 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>{act}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setNeutralizedAlert(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Incidents Table / List */}
       <div className="overflow-x-auto">
