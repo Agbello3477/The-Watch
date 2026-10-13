@@ -14,6 +14,7 @@ import { LoginModal } from './components/LoginModal';
 import { UserManagement } from './components/UserManagement';
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { SocCommandCenter } from './components/SocCommandCenter';
+import { RealtimeThreatAlertPrompt, LiveThreatAlert } from './components/RealtimeThreatAlertPrompt';
 import { api, authStorage } from './services/api';
 import {
   SystemOverview,
@@ -158,10 +159,22 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleViewThreatInWarRoom = (alert: LiveThreatAlert) => {
+    setCurrentView('dashboard');
+    setActiveSocTab('soc');
+    fetchData();
+  };
+
   // If on landing home page:
   if (currentView === 'home') {
     return (
       <>
+        {/* Real-time Threat Alert Floating HUD Prompt */}
+        <RealtimeThreatAlertPrompt
+          onViewWarRoom={handleViewThreatInWarRoom}
+          onAlertNeutralized={() => fetchData()}
+        />
+
         <LandingHome
           currentUser={currentUser}
           onOpenLogin={() => setIsLoginModalOpen(true)}
@@ -408,6 +421,12 @@ export const App: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {/* Real-time Threat Alert Floating HUD Prompt */}
+      <RealtimeThreatAlertPrompt
+        onViewWarRoom={handleViewThreatInWarRoom}
+        onAlertNeutralized={() => fetchData()}
+      />
 
       {/* Global Login Modal */}
       <LoginModal

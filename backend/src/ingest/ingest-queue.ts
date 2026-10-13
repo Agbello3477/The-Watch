@@ -5,6 +5,7 @@ import { geoIPService } from '../threat/geoip-service';
 import { advisorService } from '../advisor/advisor-service';
 import { notificationDispatcher } from '../alerts/notification-dispatcher';
 import { socEngine } from '../soc/soc-engine';
+import { realtimeAlertHub } from '../alerts/realtime-alert-hub';
 
 export interface TelemetryPayload {
   systemId: string;
@@ -152,6 +153,7 @@ export class IngestQueue {
 
           await db.saveIncident(incident);
           await notificationDispatcher.dispatchIncidentAlert(incident);
+          realtimeAlertHub.broadcastThreat(incident);
         }
       }
     }
@@ -194,6 +196,7 @@ export class IngestQueue {
 
       await db.saveIncident(incident);
       await notificationDispatcher.dispatchIncidentAlert(incident);
+      realtimeAlertHub.broadcastThreat(incident);
 
       // SOC Escalation: Create Case and execute automated quarantine
       socEngine.createCaseFromIncident({
@@ -256,6 +259,7 @@ export class IngestQueue {
 
       await db.saveIncident(incident);
       await notificationDispatcher.dispatchIncidentAlert(incident);
+      realtimeAlertHub.broadcastThreat(incident);
 
       // SOC Escalation: Create Case
       socEngine.createCaseFromIncident({
@@ -308,6 +312,7 @@ export class IngestQueue {
 
         await db.saveIncident(incident);
         await notificationDispatcher.dispatchIncidentAlert(incident);
+        realtimeAlertHub.broadcastThreat(incident);
       }
     }
   }

@@ -1,8 +1,31 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/database';
 import { geoIPService } from '../threat/geoip-service';
+import { realtimeAlertHub } from '../alerts/realtime-alert-hub';
 
 export const threatsRouter = Router();
+
+/**
+ * Real-time SSE stream for active SOC Threat alerts
+ */
+threatsRouter.get('/stream', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Prevent Nginx/proxy buffering
+  res.flushHeaders?.();
+
+  realtimeAlertHub.registerClient(res);
+});
+
+/**
+ * Fallback polling endpoint for real-time alerts
+ */
+threatsRouter.get('/live-alerts', (req: Request, res: Response) => {
+  const since = req.query.since as string;
+  const alerts = realtimeAlertHub.getAlertsSince(since);
+  res.json({ alerts, total: alerts.length });
+});
 
 /**
  * Returns geographical threat data for interactive map rendering
@@ -46,3 +69,4 @@ threatsRouter.get('/intelligence/:ip', async (req: Request, res: Response) => {
   const profile = await geoIPService.resolve(ip);
   res.json(profile);
 });
+
