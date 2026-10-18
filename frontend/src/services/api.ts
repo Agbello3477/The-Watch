@@ -147,17 +147,24 @@ export const api = {
     return res.json();
   },
 
-  async getUserAuditLogs(limit: number = 100): Promise<UserAuditLogsResponse> {
-    const res = await fetch(`${API_BASE}/users/audit?limit=${limit}`, {
+  async getUserAuditLogs(limit: number = 100, systemId?: string): Promise<UserAuditLogsResponse> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (systemId && systemId !== 'ALL') params.append('systemId', systemId);
+    const res = await fetch(`${API_BASE}/users/audit?${params.toString()}`, {
       headers: getAuthHeaders(),
     });
     return res.json();
   },
 
   async trackUserAction(data: {
-    action: 'CLICK' | 'DOWNLOAD' | 'LOGIN_SUCCESS' | 'LOGOUT';
+    action: 'CLICK' | 'DOWNLOAD' | 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'LOGOUT';
+    systemId?: string;
+    email?: string;
+    fullName?: string;
+    role?: string;
     details?: string;
     target?: string;
+    clientIp?: string;
   }): Promise<void> {
     try {
       await fetch(`${API_BASE}/audit/track`, {

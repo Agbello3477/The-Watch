@@ -245,7 +245,8 @@ usersRouter.delete('/:id', async (req: AuthenticatedUserRequest, res: Response) 
  */
 usersRouter.get('/audit', async (req: AuthenticatedUserRequest, res: Response) => {
   const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
-  const logs = await db.getUserAuditLogs(limit);
+  const systemId = req.query.systemId as string;
+  const logs = await db.getUserAuditLogs(limit, systemId);
   res.json({
     totalLogs: logs.length,
     logs,

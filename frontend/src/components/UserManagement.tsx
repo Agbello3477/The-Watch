@@ -55,6 +55,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
   // Audit Log Filtering & Live State
   const [auditSearchTerm, setAuditSearchTerm] = useState('');
   const [auditActionFilter, setAuditActionFilter] = useState<'ALL' | 'LOGIN' | 'LOGOUT' | 'CLICK' | 'DOWNLOAD' | 'ADMIN'>('ALL');
+  const [auditSystemFilter, setAuditSystemFilter] = useState<'ALL' | 'NOUN-HRMS' | 'THE_WATCH'>('ALL');
   const [liveStreamConnected, setLiveStreamConnected] = useState(false);
 
   const fetchData = async () => {
@@ -422,15 +423,68 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
           </div>
 
           {/* Filter Bar & Search */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-            {/* Filter Pills */}
+          <div className="flex flex-col gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+            {/* System Scope Tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800/60">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] text-slate-400 mr-1 flex items-center gap-1 font-semibold">
+                  <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Monitored System:</span>
+                </span>
+                {[
+                  { key: 'ALL', label: `All Systems (${auditLogs.length})` },
+                  { 
+                    key: 'NOUN-HRMS', 
+                    label: `NOUN-HRMS (${auditLogs.filter(l => (l.system_id || 'NOUN-HRMS') === 'NOUN-HRMS').length})` 
+                  },
+                  { 
+                    key: 'THE_WATCH', 
+                    label: `The Watch SOC (${auditLogs.filter(l => l.system_id === 'The Watch' || l.system_id === 'THE_WATCH').length})` 
+                  },
+                ].map((s) => (
+                  <button
+                    key={s.key}
+                    onClick={() => setAuditSystemFilter(s.key as any)}
+                    className={`px-3 py-1 rounded-lg text-xs font-mono font-semibold transition ${
+                      auditSystemFilter === s.key
+                        ? 'bg-emerald-600 text-slate-950 font-bold shadow-md shadow-emerald-600/30'
+                        : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Input */}
+              <div className="relative min-w-[240px]">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search staff, role, IP, location..."
+                  value={auditSearchTerm}
+                  onChange={(e) => setAuditSearchTerm(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700/80 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                />
+                {auditSearchTerm && (
+                  <button
+                    onClick={() => setAuditSearchTerm('')}
+                    className="absolute right-2.5 top-2 text-xs text-slate-500 hover:text-slate-300"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Action Event Filters */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[11px] text-slate-400 mr-1 flex items-center gap-1">
                 <Filter className="w-3 h-3 text-cyan-400" />
-                <span>Filter:</span>
+                <span>Action:</span>
               </span>
               {[
-                { key: 'ALL', label: `All Events (${auditLogs.length})` },
+                { key: 'ALL', label: 'All Actions' },
                 { key: 'LOGIN', label: 'Logins' },
                 { key: 'LOGOUT', label: 'Logouts' },
                 { key: 'CLICK', label: 'Clicks' },
@@ -450,26 +504,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
                 </button>
               ))}
             </div>
-
-            {/* Search Input */}
-            <div className="relative min-w-[240px]">
-              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search staff, role, IP, location..."
-                value={auditSearchTerm}
-                onChange={(e) => setAuditSearchTerm(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700/80 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
-              />
-              {auditSearchTerm && (
-                <button
-                  onClick={() => setAuditSearchTerm('')}
-                  className="absolute right-2.5 top-2 text-xs text-slate-500 hover:text-slate-300"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
           </div>
 
           {/* Audit Log Table */}
@@ -478,6 +512,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
               <thead className="bg-slate-950 border-b border-slate-800 text-[11px] uppercase text-slate-400">
                 <tr>
                   <th className="px-3.5 py-3 whitespace-nowrap">Timestamp (WAT)</th>
+                  <th className="px-3.5 py-3 whitespace-nowrap">System Scope</th>
                   <th className="px-3.5 py-3 whitespace-nowrap">Action</th>
                   <th className="px-3.5 py-3 whitespace-nowrap">Staff Name & Email</th>
                   <th className="px-3.5 py-3 whitespace-nowrap">System Role</th>
@@ -490,6 +525,11 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
               <tbody className="divide-y divide-slate-800/60 bg-slate-900/40">
                 {auditLogs
                   .filter((log) => {
+                    // System Scope filter
+                    if (auditSystemFilter === 'NOUN-HRMS' && (log.system_id || 'NOUN-HRMS') !== 'NOUN-HRMS') return false;
+                    if (auditSystemFilter === 'THE_WATCH' && log.system_id !== 'The Watch' && log.system_id !== 'THE_WATCH') return false;
+
+                    // Action filter
                     if (auditActionFilter === 'LOGIN' && log.action !== 'LOGIN_SUCCESS' && log.action !== 'LOGIN_FAILED') return false;
                     if (auditActionFilter === 'LOGOUT' && log.action !== 'LOGOUT') return false;
                     if (auditActionFilter === 'CLICK' && log.action !== 'CLICK') return false;
@@ -502,6 +542,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
                         log.email?.toLowerCase().includes(term) ||
                         log.full_name?.toLowerCase().includes(term) ||
                         log.role?.toLowerCase().includes(term) ||
+                        log.system_id?.toLowerCase().includes(term) ||
                         log.ip_address?.toLowerCase().includes(term) ||
                         log.location?.toLowerCase().includes(term) ||
                         log.details?.toLowerCase().includes(term) ||
@@ -520,6 +561,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
                         {/* Timestamp in WAT */}
                         <td className="px-3.5 py-3 text-[11px] text-cyan-400 whitespace-nowrap font-semibold">
                           {log.created_at_wat || 'WAT'}
+                        </td>
+
+                        {/* System Scope */}
+                        <td className="px-3.5 py-3 whitespace-nowrap">
+                          {(log.system_id || 'NOUN-HRMS') === 'NOUN-HRMS' ? (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                              NOUN-HRMS
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-800">
+                              {log.system_id || 'The Watch'}
+                            </span>
+                          )}
                         </td>
 
                         {/* Action Badge */}
@@ -588,17 +643,31 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
                         {/* System Role */}
                         <td className="px-3.5 py-3 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                            role === 'SUPER_ADMIN'
-                              ? 'bg-purple-950/80 text-purple-300 border-purple-800'
+                            role === 'SUPER_ADMIN' || role === 'SUPER_USER'
+                              ? 'bg-purple-950/90 text-purple-300 border-purple-700'
+                              : role === 'VICE_CHANCELLOR'
+                              ? 'bg-amber-950/90 text-amber-300 border-amber-600'
+                              : role === 'REGISTRAR'
+                              ? 'bg-indigo-950/90 text-indigo-300 border-indigo-700'
+                              : role === 'DIRECTOR'
+                              ? 'bg-blue-950/90 text-blue-300 border-blue-700'
+                              : role === 'UNIT_HEAD'
+                              ? 'bg-teal-950/90 text-teal-300 border-teal-700'
+                              : role === 'HR_ADMIN'
+                              ? 'bg-cyan-950/90 text-cyan-300 border-cyan-700'
+                              : role === 'BURSARY'
+                              ? 'bg-emerald-950/90 text-emerald-300 border-emerald-700'
+                              : role === 'AUDIT' || role === 'AUDITOR'
+                              ? 'bg-yellow-950/90 text-yellow-300 border-yellow-700'
+                              : role === 'STUDY_CENTER_MANAGER'
+                              ? 'bg-sky-950/90 text-sky-300 border-sky-700'
                               : role === 'SOC_ANALYST'
                               ? 'bg-cyan-950/80 text-cyan-300 border-cyan-800'
                               : role === 'SECURITY_OPERATOR'
                               ? 'bg-blue-950/80 text-blue-300 border-blue-800'
-                              : role === 'AUDITOR'
-                              ? 'bg-amber-950/80 text-amber-300 border-amber-800'
                               : 'bg-slate-800 text-slate-300 border-slate-700'
                           }`}>
-                            {role.replace('_', ' ')}
+                            {role.replace(/_/g, ' ')}
                           </span>
                         </td>
 

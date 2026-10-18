@@ -12,39 +12,45 @@ export const auditRouter = Router();
  */
 auditRouter.post('/track', async (req: Request, res: Response) => {
   try {
-    const { action, details, target } = req.body;
+    const { 
+      action, 
+      details, 
+      target, 
+      systemId, 
+      email: bodyEmail, 
+      fullName: bodyFullName, 
+      role: bodyRole, 
+      clientIp: bodyClientIp,
+      status: bodyStatus
+    } = req.body;
 
     if (!action) {
       res.status(400).json({ error: 'MISSING_ACTION', message: 'Action type is required.' });
       return;
     }
 
-    // 1. Resolve Authenticated User (if token provided)
+    // 1. Resolve User Identity (from body payload or Bearer token)
+    let email = bodyEmail || 'visitor@noun-hrms.gov.ng';
+    let fullName = bodyFullName || 'NOUN HRMS Operator';
+    let role = bodyRole || 'STAFF';
+    let userId: string | undefined = undefined;
+
     const authHeader = req.headers.authorization;
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : (req.query.token as string);
-    let user = {
-      id: undefined as string | undefined,
-      email: 'visitor@soc.session',
-      fullName: 'Anonymous Visitor',
-      role: 'GUEST',
-    };
 
     if (token) {
       const decoded = authService.verifyToken(token);
       if (decoded) {
-        user = {
-          id: decoded.sub,
-          email: decoded.email,
-          fullName: decoded.name || decoded.email,
-          role: decoded.role || 'SOC_ANALYST',
-        };
+        userId = decoded.sub;
+        if (!bodyEmail) email = decoded.email;
+        if (!bodyFullName) fullName = decoded.name || decoded.email;
+        if (!bodyRole) role = decoded.role || 'SOC_ANALYST';
       }
     }
 
-    // 2. Resolve IP Address
-    const ipAddress = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '127.0.0.1')
-      .split(',')[0]
-      .trim();
+    // 2. Resolve Client IP Address
+    const rawIp = bodyClientIp || (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '127.0.0.1');
+    const ipAddress = String(rawIp).split(',')[0].trim();
 
     // 3. Resolve GeoIP Location
     const geo = await geoIPService.resolve(ipAddress);
@@ -53,18 +59,19 @@ auditRouter.post('/track', async (req: Request, res: Response) => {
     // 4. Construct Audit Log
     const auditLog: UserAuditLog = {
       id: `ual-${(action || 'act').toLowerCase()}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      user_id: user.id,
-      email: user.email,
-      full_name: user.fullName,
-      role: user.role,
+      system_id: systemId || 'NOUN-HRMS',
+      user_id: userId,
+      email,
+      full_name: fullName,
+      role,
       action: action as any,
       ip_address: ipAddress,
       location,
       geo_city: geo.city,
       geo_country: geo.country,
-      user_agent: req.headers['user-agent'],
-      status: 'SUCCESS',
-      details: details || (target ? `Interacted with: ${target}` : `${action} event`),
+      user_agent: req.headers['user-agent'] || 'NOUN-HRMS Client',
+      status: (bodyStatus as any) || 'SUCCESS',
+      details: details || (target ? `Interacted with: ${target}` : `${action} on ${systemId || 'NOUN-HRMS'}`),
       created_at_wat: getWATFormattedDate(),
       created_at: new Date().toISOString(),
     };
@@ -88,7 +95,8 @@ auditRouter.post('/track', async (req: Request, res: Response) => {
  */
 auditRouter.get('/recent', async (req: Request, res: Response) => {
   const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
-  const logs = await db.getUserAuditLogs(limit);
+  const systemId = req.query.systemId as string;
+  const logs = await db.getUserAuditLogs(limit, systemId);
   res.json({
     totalLogs: logs.length,
     logs,

@@ -23,6 +23,7 @@ export interface User {
 
 export interface UserAuditLog {
   id: string;
+  system_id?: string;
   user_id?: string;
   email: string;
   full_name?: string;
@@ -210,6 +211,7 @@ class DatabaseManager {
         // Auto-migrate audit log columns if not present
         await client.query(`
           ALTER TABLE IF EXISTS user_audit_logs 
+          ADD COLUMN IF NOT EXISTS system_id VARCHAR(64) DEFAULT 'NOUN-HRMS',
           ADD COLUMN IF NOT EXISTS full_name VARCHAR(255),
           ADD COLUMN IF NOT EXISTS role VARCHAR(64),
           ADD COLUMN IF NOT EXISTS location VARCHAR(255),
@@ -534,10 +536,11 @@ class DatabaseManager {
     if (this.isPostgresConnected && this.pgPool) {
       try {
         await this.pgPool.query(
-          `INSERT INTO user_audit_logs (id, user_id, email, full_name, role, action, ip_address, location, geo_city, geo_country, user_agent, status, details, created_at_wat, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+          `INSERT INTO user_audit_logs (id, system_id, user_id, email, full_name, role, action, ip_address, location, geo_city, geo_country, user_agent, status, details, created_at_wat, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
           [
             log.id,
+            log.system_id || 'NOUN-HRMS',
             log.user_id || null,
             log.email,
             log.full_name || null,
@@ -555,17 +558,22 @@ class DatabaseManager {
           ]
         );
       } catch (e) {
-        // Fallback for older table schema without new columns
+        // Fallback for older table schema without system_id
         try {
           await this.pgPool.query(
-            `INSERT INTO user_audit_logs (id, user_id, email, action, ip_address, user_agent, status, details, created_at_wat, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            `INSERT INTO user_audit_logs (id, user_id, email, full_name, role, action, ip_address, location, geo_city, geo_country, user_agent, status, details, created_at_wat, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
             [
               log.id,
               log.user_id || null,
               log.email,
+              log.full_name || null,
+              log.role || null,
               log.action,
               log.ip_address,
+              log.location || null,
+              log.geo_city || null,
+              log.geo_country || null,
               log.user_agent || null,
               log.status,
               log.details || null,
@@ -583,12 +591,25 @@ class DatabaseManager {
     }
   }
 
-  public async getUserAuditLogs(limit: number = 100): Promise<UserAuditLog[]> {
+  public async getUserAuditLogs(limit: number = 100, systemId?: string): Promise<UserAuditLog[]> {
     if (this.isPostgresConnected && this.pgPool) {
       try {
+        if (systemId && systemId !== 'ALL') {
+          const res = await this.pgPool.query(
+            'SELECT * FROM user_audit_logs WHERE system_id = $1 OR system_id IS NULL ORDER BY created_at DESC LIMIT $2',
+            [systemId, limit]
+          );
+          return res.rows;
+        }
         const res = await this.pgPool.query('SELECT * FROM user_audit_logs ORDER BY created_at DESC LIMIT $1', [limit]);
         return res.rows;
       } catch (e) {}
+    }
+
+    if (systemId && systemId !== 'ALL') {
+      return this.memoryStore.userAuditLogs
+        .filter((l) => !l.system_id || l.system_id === systemId)
+        .slice(0, limit);
     }
 
     return this.memoryStore.userAuditLogs.slice(0, limit);

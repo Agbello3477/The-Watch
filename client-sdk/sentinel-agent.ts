@@ -30,7 +30,8 @@ import type { Request, Response, NextFunction } from 'express';
 const THE_WATCH_URL    = process.env.THE_WATCH_URL    || 'http://localhost:4000';
 const THE_WATCH_KEY    = process.env.THE_WATCH_API_KEY || 'tel_sec_noun_hrms_98234';
 const THE_WATCH_SYSTEM = process.env.THE_WATCH_SYSTEM_ID || 'NOUN-HRMS';
-const INGEST_ENDPOINT  = `${THE_WATCH_URL}/api/v1/telemetry/ingest`;
+const INGEST_ENDPOINT  = `${THE_WATCH_URL.replace(/\/$/, '')}/api/v1/telemetry/ingest`;
+const AUDIT_ENDPOINT   = `${THE_WATCH_URL.replace(/\/$/, '')}/api/v1/audit/track`;
 
 // ─── Paths to never ship (reduces noise, saves bandwidth) ───
 const SKIP_PATHS = [
@@ -41,7 +42,7 @@ const SKIP_PATHS = [
 ];
 
 // ─── Fire-and-forget telemetry shipper ──────────────────────
-function ship(payload: object): void {
+export function shipTelemetry(payload: object): void {
   // Non-blocking: we never await this. If The Watch is down, HRMS keeps running.
   fetch(INGEST_ENDPOINT, {
     method: 'POST',
@@ -52,6 +53,31 @@ function ship(payload: object): void {
     body: JSON.stringify(payload),
   }).catch(() => {
     // Silently swallow — The Watch being unreachable MUST NOT affect HRMS
+  });
+}
+
+// ─── Real-Time User Audit Shipper (Logins, Logouts, Clicks, Downloads) ──
+export function shipUserAudit(audit: {
+  action: 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'LOGOUT' | 'CLICK' | 'DOWNLOAD';
+  email: string;
+  fullName?: string;
+  role?: string;
+  clientIp?: string;
+  details?: string;
+  target?: string;
+  status?: 'SUCCESS' | 'FAILED' | 'BLOCKED';
+}): void {
+  fetch(AUDIT_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      systemId: THE_WATCH_SYSTEM,
+      ...audit,
+    }),
+  }).catch(() => {
+    // Non-blocking
   });
 }
 
@@ -82,27 +108,60 @@ export function sentinelAgent(req: Request, res: Response, next: NextFunction): 
   // Hook into the response 'finish' event — fires after headers sent
   res.on('finish', () => {
     const latencyMs = Date.now() - startedAt;
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+      || req.socket?.remoteAddress
+      || req.ip
+      || '127.0.0.1';
 
-    ship({
+    // 1. Ship HTTP Telemetry
+    shipTelemetry({
       systemId:       THE_WATCH_SYSTEM,
       method:         req.method,
       path:           req.originalUrl || req.path,
       statusCode:     res.statusCode,
       latencyMs,
-      clientIp:       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
-                        || req.socket?.remoteAddress
-                        || req.ip
-                        || '0.0.0.0',
+      clientIp,
       userAgent:      req.headers['user-agent'],
       payloadSnippet,
       errorMessage:   res.statusCode >= 500 ? `HTTP ${res.statusCode} on ${req.method} ${req.path}` : undefined,
       timestamp:      new Date().toISOString(),
     });
+
+    // 2. Automatically detect and ship DOWNLOAD events
+    const contentDisposition = String(res.getHeader('content-disposition') || '');
+    const contentType = String(res.getHeader('content-type') || '');
+    const reqPath = req.originalUrl || req.path;
+    const isDownload =
+      contentDisposition.toLowerCase().includes('attachment') ||
+      reqPath.includes('/download') ||
+      reqPath.includes('/export') ||
+      reqPath.includes('/pdf') ||
+      reqPath.includes('/csv') ||
+      reqPath.includes('/slip') ||
+      contentType.includes('application/pdf') ||
+      contentType.includes('application/octet-stream') ||
+      contentType.includes('text/csv');
+
+    if (isDownload && res.statusCode >= 200 && res.statusCode < 400) {
+      const authUser = (req as any).user;
+      shipUserAudit({
+        action: 'DOWNLOAD',
+        email: authUser?.email || 'authenticated-staff@noun-hrms.gov.ng',
+        fullName: authUser?.name || 'NOUN HRMS Staff',
+        role: authUser?.role || 'STAFF',
+        clientIp,
+        details: `Downloaded resource from ${reqPath}`,
+        target: reqPath,
+        status: 'SUCCESS',
+      });
+    }
   });
 
   next();
 }
 
 // ─── CommonJS default export (for require() compatibility) ──
-module.exports = { sentinelAgent };
+module.exports = { sentinelAgent, shipTelemetry, shipUserAudit };
 module.exports.sentinelAgent = sentinelAgent;
+module.exports.shipTelemetry = shipTelemetry;
+module.exports.shipUserAudit = shipUserAudit;
