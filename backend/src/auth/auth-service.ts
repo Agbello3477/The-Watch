@@ -1,8 +1,9 @@
 import crypto from 'crypto';
-import { db, User, hashPassword, getWATFormattedDate } from '../db/database';
+import { db, User, UserAuditLog, hashPassword, getWATFormattedDate } from '../db/database';
 import { CONFIG } from '../config';
 import { geoIPService } from '../threat/geoip-service';
 import { ddosDetector } from '../threat/ddos-detector';
+import { realtimeAlertHub } from '../alerts/realtime-alert-hub';
 
 export interface AuthSessionUser {
   id: string;
@@ -68,16 +69,23 @@ export class AuthService {
 
     if (!user) {
       // Record failed attempt audit log
-      await db.saveUserAuditLog({
+      const auditLog: UserAuditLog = {
         id: `ual-fail-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         email: cleanEmail,
+        full_name: 'Unregistered User',
+        role: 'GUEST',
         action: 'LOGIN_FAILED',
         ip_address: ipAddress,
+        location: locationStr,
+        geo_city: geo.city,
+        geo_country: geo.country,
         user_agent: userAgent,
         status: 'FAILED',
         details: `Login attempt for non-existent user from ${locationStr}`,
         created_at_wat: getWATFormattedDate(),
-      });
+      };
+      await db.saveUserAuditLog(auditLog);
+      realtimeAlertHub.broadcastAuditLog(auditLog);
 
       // Track 401 failure against DDoS & Credential stuffing detector
       await ddosDetector.trackAndInspect({
@@ -95,17 +103,24 @@ export class AuthService {
 
     // 3. Check Account Suspension
     if (user.status === 'SUSPENDED') {
-      await db.saveUserAuditLog({
+      const auditLog: UserAuditLog = {
         id: `ual-susp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         user_id: user.id,
         email: user.email,
+        full_name: user.full_name,
+        role: user.role,
         action: 'LOGIN_FAILED',
         ip_address: ipAddress,
+        location: locationStr,
+        geo_city: geo.city,
+        geo_country: geo.country,
         user_agent: userAgent,
         status: 'BLOCKED',
         details: `Suspended account access denied from ${locationStr}`,
         created_at_wat: getWATFormattedDate(),
-      });
+      };
+      await db.saveUserAuditLog(auditLog);
+      realtimeAlertHub.broadcastAuditLog(auditLog);
 
       return {
         success: false,
@@ -120,17 +135,24 @@ export class AuthService {
       if (Date.now() < lockExpiry) {
         const minutesLeft = Math.ceil((lockExpiry - Date.now()) / 60000);
 
-        await db.saveUserAuditLog({
+        const auditLog: UserAuditLog = {
           id: `ual-lock-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           user_id: user.id,
           email: user.email,
+          full_name: user.full_name,
+          role: user.role,
           action: 'LOGIN_FAILED',
           ip_address: ipAddress,
+          location: locationStr,
+          geo_city: geo.city,
+          geo_country: geo.country,
           user_agent: userAgent,
           status: 'BLOCKED',
           details: `Login blocked: account locked for ${minutesLeft} more minutes from ${locationStr}`,
           created_at_wat: getWATFormattedDate(),
-        });
+        };
+        await db.saveUserAuditLog(auditLog);
+        realtimeAlertHub.broadcastAuditLog(auditLog);
 
         return {
           success: false,
@@ -154,19 +176,26 @@ export class AuthService {
 
       await db.incrementFailedLoginAttempts(cleanEmail, lockUntil);
 
-      await db.saveUserAuditLog({
+      const auditLog: UserAuditLog = {
         id: `ual-badpass-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         user_id: user.id,
         email: user.email,
+        full_name: user.full_name,
+        role: user.role,
         action: 'LOGIN_FAILED',
         ip_address: ipAddress,
+        location: locationStr,
+        geo_city: geo.city,
+        geo_country: geo.country,
         user_agent: userAgent,
         status: 'FAILED',
         details: lockUntil
           ? `Account locked: exceeded ${this.MAX_FAILED_ATTEMPTS} failed attempts from ${locationStr}`
           : `Failed password attempt (${newAttempts}/${this.MAX_FAILED_ATTEMPTS}) from ${locationStr}`,
         created_at_wat: getWATFormattedDate(),
-      });
+      };
+      await db.saveUserAuditLog(auditLog);
+      realtimeAlertHub.broadcastAuditLog(auditLog);
 
       // Track credential stuffing trigger
       await ddosDetector.trackAndInspect({
@@ -207,17 +236,24 @@ export class AuthService {
 
     const token = this.generateToken(sessionUser);
 
-    await db.saveUserAuditLog({
+    const auditLog: UserAuditLog = {
       id: `ual-ok-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       user_id: user.id,
       email: user.email,
+      full_name: user.full_name,
+      role: user.role,
       action: 'LOGIN_SUCCESS',
       ip_address: ipAddress,
+      location: locationStr,
+      geo_city: geo.city,
+      geo_country: geo.country,
       user_agent: userAgent,
       status: 'SUCCESS',
       details: `Successful authenticated session started from ${locationStr}`,
       created_at_wat: getWATFormattedDate(),
-    });
+    };
+    await db.saveUserAuditLog(auditLog);
+    realtimeAlertHub.broadcastAuditLog(auditLog);
 
     return {
       success: true,

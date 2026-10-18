@@ -12,6 +12,11 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({ selectedSystem }
 
   const handleDownloadPdf = () => {
     setDownloadingPdf(true);
+    api.trackUserAction({
+      action: 'DOWNLOAD',
+      details: `Downloaded PDF Audit Report (${selectedSystem || 'All Monitored Systems'})`,
+      target: 'PDF Forensic Report',
+    });
     const url = api.getPdfReportUrl(selectedSystem || undefined);
     window.open(url, '_blank');
     setTimeout(() => setDownloadingPdf(false), 2000);
@@ -19,6 +24,11 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({ selectedSystem }
 
   const handleDownloadCsv = () => {
     setDownloadingCsv(true);
+    api.trackUserAction({
+      action: 'DOWNLOAD',
+      details: `Downloaded CSV Audit Logs (${selectedSystem || 'All Monitored Systems'})`,
+      target: 'CSV Forensic Logs',
+    });
     const url = api.getCsvReportUrl(selectedSystem || undefined);
     window.open(url, '_blank');
     setTimeout(() => setDownloadingCsv(false), 2000);

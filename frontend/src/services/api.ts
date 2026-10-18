@@ -154,6 +154,22 @@ export const api = {
     return res.json();
   },
 
+  async trackUserAction(data: {
+    action: 'CLICK' | 'DOWNLOAD' | 'LOGIN_SUCCESS' | 'LOGOUT';
+    details?: string;
+    target?: string;
+  }): Promise<void> {
+    try {
+      await fetch(`${API_BASE}/audit/track`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+    } catch {
+      // Non-blocking telemetry
+    }
+  },
+
   // ================= SOC PLATFORM OPERATIONS =================
   async getOverview(systemId?: string): Promise<SystemOverview> {
     const query = systemId ? `?systemId=${encodeURIComponent(systemId)}` : '';

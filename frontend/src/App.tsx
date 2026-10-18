@@ -112,6 +112,52 @@ export const App: React.FC = () => {
     };
   }, [currentUser]);
 
+  // Real-time Click Monitoring & Recording for every interactive action across all users
+  useEffect(() => {
+    let lastTracked = 0;
+    let lastTargetText = '';
+
+    const handleGlobalClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+
+      // Identify interactive elements (buttons, links, menu items, tabs, inputs)
+      const interactiveEl = target.closest('button, a, [role="button"], input[type="submit"], select, [data-track]');
+      if (!interactiveEl) return;
+
+      const rawText = (
+        interactiveEl.getAttribute('data-track') ||
+        interactiveEl.getAttribute('aria-label') ||
+        interactiveEl.getAttribute('title') ||
+        interactiveEl.textContent?.trim().slice(0, 80) ||
+        interactiveEl.tagName.toLowerCase()
+      ).replace(/\s+/g, ' ');
+
+      const now = Date.now();
+      // Throttle identical rapid clicks within 800ms
+      if (now - lastTracked < 800 && lastTargetText === rawText) {
+        return;
+      }
+
+      lastTracked = now;
+      lastTargetText = rawText;
+
+      const tagName = interactiveEl.tagName.toLowerCase();
+      const details = `Clicked <${tagName}> "${rawText}"`;
+
+      api.trackUserAction({
+        action: 'CLICK',
+        details,
+        target: rawText,
+      });
+    };
+
+    window.addEventListener('click', handleGlobalClick, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('click', handleGlobalClick, { capture: true });
+    };
+  }, [currentUser]);
+
   const fetchData = useCallback(async () => {
     if (currentView === 'home') return; // Don't aggressively poll when on home view
     setIsRefreshing(true);

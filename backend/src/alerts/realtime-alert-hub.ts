@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { ThreatIncident, getWATFormattedDate } from '../db/database';
+import { ThreatIncident, UserAuditLog, getWATFormattedDate } from '../db/database';
 
 export interface RealtimeAlertPayload {
   id: string;
@@ -87,6 +87,21 @@ export class RealtimeAlertHub {
     }
 
     console.log(`[RealtimeAlertHub] 🚨 Broadcasted ${payload.severity} threat "${payload.threatClassification}" to ${this.clients.size} active SOC operator sessions.`);
+  }
+
+  /**
+   * Broadcast a user activity audit log (LOGIN, LOGOUT, CLICK, DOWNLOAD) in real time
+   */
+  public broadcastAuditLog(log: UserAuditLog): void {
+    const sseMessage = `event: user-audit\ndata: ${JSON.stringify(log)}\n\n`;
+    for (const client of this.clients) {
+      try {
+        client.write(sseMessage);
+      } catch (err) {
+        this.clients.delete(client);
+      }
+    }
+    console.log(`[RealtimeAlertHub] 📋 Broadcasted audit event [${log.action}] for "${log.full_name || log.email}" to ${this.clients.size} active SOC operator sessions.`);
   }
 
   /**

@@ -1,6 +1,8 @@
 import { Router, Response } from 'express';
 import { authenticateUser, requireSuperAdmin, AuthenticatedUserRequest } from '../middleware/user-auth';
-import { db, User, hashPassword, getWATFormattedDate } from '../db/database';
+import { db, User, UserAuditLog, hashPassword, getWATFormattedDate } from '../db/database';
+import { geoIPService } from '../threat/geoip-service';
+import { realtimeAlertHub } from '../alerts/realtime-alert-hub';
 
 export const usersRouter = Router();
 
@@ -90,17 +92,27 @@ usersRouter.post('/', async (req: AuthenticatedUserRequest, res: Response) => {
   await db.saveUser(newUser);
 
   // Record Audit Log
-  await db.saveUserAuditLog({
+  const geoCreate = await geoIPService.resolve(clientIp);
+  const locationCreate = `${geoCreate.city}, ${geoCreate.country}${geoCreate.asn ? ` (${geoCreate.asn})` : ''}`;
+  const createLog: UserAuditLog = {
     id: `ual-create-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     user_id: newUser.id,
     email: newUser.email,
+    full_name: adminUser.fullName || adminUser.email,
+    role: adminUser.role,
     action: 'ACCOUNT_CREATED',
     ip_address: clientIp,
+    location: locationCreate,
+    geo_city: geoCreate.city,
+    geo_country: geoCreate.country,
     user_agent: req.headers['user-agent'],
     status: 'SUCCESS',
-    details: `Account created by Super Admin (${adminUser.email}) with role ${newUser.role}`,
+    details: `Account created for ${newUser.email} with role ${newUser.role} by ${adminUser.fullName || adminUser.email}`,
     created_at_wat: getWATFormattedDate(),
-  });
+    created_at: new Date().toISOString(),
+  };
+  await db.saveUserAuditLog(createLog);
+  realtimeAlertHub.broadcastAuditLog(createLog);
 
   const { password_hash, salt: userSalt, ...safeUser } = newUser;
 
@@ -138,18 +150,28 @@ usersRouter.patch('/:id/status', async (req: AuthenticatedUserRequest, res: Resp
   }
 
   // Record Audit Log
+  const geoStatus = await geoIPService.resolve(clientIp);
+  const locationStatus = `${geoStatus.city}, ${geoStatus.country}${geoStatus.asn ? ` (${geoStatus.asn})` : ''}`;
   const action = status === 'SUSPENDED' ? 'ACCOUNT_SUSPENDED' : 'ACCOUNT_ACTIVATED';
-  await db.saveUserAuditLog({
+  const statusLog: UserAuditLog = {
     id: `ual-stat-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     user_id: updated.id,
     email: updated.email,
+    full_name: adminUser.fullName || adminUser.email,
+    role: adminUser.role,
     action,
     ip_address: clientIp,
+    location: locationStatus,
+    geo_city: geoStatus.city,
+    geo_country: geoStatus.country,
     user_agent: req.headers['user-agent'],
     status: 'SUCCESS',
-    details: `Account status updated to ${status} by Super Admin (${adminUser.email})`,
+    details: `User ${updated.email} status changed to ${status} by ${adminUser.fullName || adminUser.email}`,
     created_at_wat: getWATFormattedDate(),
-  });
+    created_at: new Date().toISOString(),
+  };
+  await db.saveUserAuditLog(statusLog);
+  realtimeAlertHub.broadcastAuditLog(statusLog);
 
   res.json({
     success: true,
@@ -190,17 +212,27 @@ usersRouter.delete('/:id', async (req: AuthenticatedUserRequest, res: Response) 
   }
 
   // Record Audit Log
-  await db.saveUserAuditLog({
+  const geoDelete = await geoIPService.resolve(clientIp);
+  const locationDelete = `${geoDelete.city}, ${geoDelete.country}${geoDelete.asn ? ` (${geoDelete.asn})` : ''}`;
+  const deleteLog: UserAuditLog = {
     id: `ual-del-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     user_id: user.id,
     email: user.email,
+    full_name: adminUser.fullName || adminUser.email,
+    role: adminUser.role,
     action: 'ACCOUNT_DELETED',
     ip_address: clientIp,
+    location: locationDelete,
+    geo_city: geoDelete.city,
+    geo_country: geoDelete.country,
     user_agent: req.headers['user-agent'],
     status: 'SUCCESS',
-    details: `User ${user.email} (${user.role}) permanently deleted by Super Admin (${adminUser.email})`,
+    details: `User ${user.email} (${user.role}) permanently deleted by ${adminUser.fullName || adminUser.email}`,
     created_at_wat: getWATFormattedDate(),
-  });
+    created_at: new Date().toISOString(),
+  };
+  await db.saveUserAuditLog(deleteLog);
+  realtimeAlertHub.broadcastAuditLog(deleteLog);
 
   res.json({
     success: true,

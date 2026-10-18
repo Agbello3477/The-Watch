@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { authService } from '../auth/auth-service';
 import { authenticateUser, AuthenticatedUserRequest } from '../middleware/user-auth';
-import { db, getWATFormattedDate } from '../db/database';
+import { db, UserAuditLog, getWATFormattedDate } from '../db/database';
+import { geoIPService } from '../threat/geoip-service';
+import { realtimeAlertHub } from '../alerts/realtime-alert-hub';
 
 export const authRouter = Router();
 
@@ -55,17 +57,28 @@ authRouter.get('/me', authenticateUser, (req: AuthenticatedUserRequest, res: Res
 authRouter.post('/logout', authenticateUser, async (req: AuthenticatedUserRequest, res: Response) => {
   const user = req.user!;
   const ipAddress = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '127.0.0.1').split(',')[0].trim();
+  const geo = await geoIPService.resolve(ipAddress);
+  const location = `${geo.city}, ${geo.country}${geo.asn ? ` (${geo.asn})` : ''}`;
 
-  await db.saveUserAuditLog({
+  const auditLog: UserAuditLog = {
     id: `ual-logout-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     user_id: user.id,
     email: user.email,
-    action: 'LOGIN_SUCCESS',
+    full_name: user.fullName || user.email,
+    role: user.role,
+    action: 'LOGOUT',
     ip_address: ipAddress,
+    location,
+    geo_city: geo.city,
+    geo_country: geo.country,
+    user_agent: req.headers['user-agent'],
     status: 'SUCCESS',
-    details: 'User initiated secure session logout',
+    details: `User signed out of session from ${location}`,
     created_at_wat: getWATFormattedDate(),
-  });
+  };
+
+  await db.saveUserAuditLog(auditLog);
+  realtimeAlertHub.broadcastAuditLog(auditLog);
 
   res.json({
     success: true,

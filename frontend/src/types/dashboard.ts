@@ -177,8 +177,13 @@ export interface UserAuditLog {
   id: string;
   user_id?: string;
   email: string;
-  action: 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'ACCOUNT_CREATED' | 'ACCOUNT_SUSPENDED' | 'ACCOUNT_ACTIVATED' | 'ACCOUNT_DELETED';
+  full_name?: string;
+  role?: string;
+  action: 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'LOGOUT' | 'CLICK' | 'DOWNLOAD' | 'ACCOUNT_CREATED' | 'ACCOUNT_SUSPENDED' | 'ACCOUNT_ACTIVATED' | 'ACCOUNT_DELETED';
   ip_address: string;
+  location?: string;
+  geo_city?: string;
+  geo_country?: string;
   user_agent?: string;
   status: 'SUCCESS' | 'FAILED' | 'BLOCKED';
   details?: string;

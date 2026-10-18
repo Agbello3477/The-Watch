@@ -25,8 +25,13 @@ export interface UserAuditLog {
   id: string;
   user_id?: string;
   email: string;
-  action: 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'ACCOUNT_CREATED' | 'ACCOUNT_SUSPENDED' | 'ACCOUNT_ACTIVATED' | 'ACCOUNT_DELETED';
+  full_name?: string;
+  role?: string;
+  action: 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'LOGOUT' | 'CLICK' | 'DOWNLOAD' | 'ACCOUNT_CREATED' | 'ACCOUNT_SUSPENDED' | 'ACCOUNT_ACTIVATED' | 'ACCOUNT_DELETED';
   ip_address: string;
+  location?: string;
+  geo_city?: string;
+  geo_country?: string;
   user_agent?: string;
   status: 'SUCCESS' | 'FAILED' | 'BLOCKED';
   details?: string;
@@ -202,6 +207,15 @@ class DatabaseManager {
           const sql = fs.readFileSync(schemaPath, 'utf-8');
           await client.query(sql);
         }
+        // Auto-migrate audit log columns if not present
+        await client.query(`
+          ALTER TABLE IF EXISTS user_audit_logs 
+          ADD COLUMN IF NOT EXISTS full_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS role VARCHAR(64),
+          ADD COLUMN IF NOT EXISTS location VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS geo_city VARCHAR(128),
+          ADD COLUMN IF NOT EXISTS geo_country VARCHAR(128);
+        `).catch(() => {});
         client.release();
         this.isPostgresConnected = true;
         console.log('[DB] Connected to PostgreSQL successfully.');
@@ -520,14 +534,19 @@ class DatabaseManager {
     if (this.isPostgresConnected && this.pgPool) {
       try {
         await this.pgPool.query(
-          `INSERT INTO user_audit_logs (id, user_id, email, action, ip_address, user_agent, status, details, created_at_wat, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          `INSERT INTO user_audit_logs (id, user_id, email, full_name, role, action, ip_address, location, geo_city, geo_country, user_agent, status, details, created_at_wat, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
           [
             log.id,
             log.user_id || null,
             log.email,
+            log.full_name || null,
+            log.role || null,
             log.action,
             log.ip_address,
+            log.location || null,
+            log.geo_city || null,
+            log.geo_country || null,
             log.user_agent || null,
             log.status,
             log.details || null,
@@ -535,7 +554,27 @@ class DatabaseManager {
             log.created_at,
           ]
         );
-      } catch (e) {}
+      } catch (e) {
+        // Fallback for older table schema without new columns
+        try {
+          await this.pgPool.query(
+            `INSERT INTO user_audit_logs (id, user_id, email, action, ip_address, user_agent, status, details, created_at_wat, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [
+              log.id,
+              log.user_id || null,
+              log.email,
+              log.action,
+              log.ip_address,
+              log.user_agent || null,
+              log.status,
+              log.details || null,
+              log.created_at_wat,
+              log.created_at,
+            ]
+          );
+        } catch {}
+      }
     }
 
     this.memoryStore.userAuditLogs.unshift(log);
