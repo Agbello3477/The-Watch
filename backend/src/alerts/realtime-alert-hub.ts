@@ -1,5 +1,7 @@
 import { Response } from 'express';
 import { ThreatIncident, UserAuditLog, getWATFormattedDate } from '../db/database';
+import { notificationDispatcher } from './notification-dispatcher';
+import { CONFIG } from '../config';
 
 export interface RealtimeAlertPayload {
   id: string;
@@ -22,6 +24,8 @@ export interface RealtimeAlertPayload {
   status: 'UNRESOLVED' | 'ACKNOWLEDGED' | 'RESOLVED';
   mitigationBlueprint?: string;
   remediationSummary?: string;
+  reroutedToPhone?: string;
+  reroutedToEmail?: string;
   timestampWat: string;
   timestampIso: string;
 }
@@ -77,6 +81,8 @@ export class RealtimeAlertHub {
       status: incident.status || 'UNRESOLVED',
       mitigationBlueprint: incident.mitigation_blueprint || incident.mitigationBlueprint,
       remediationSummary: incident.remediation_summary || incident.remediationSummary,
+      reroutedToPhone: CONFIG.PRIMARY_EMERGENCY_PHONE,
+      reroutedToEmail: CONFIG.PRIMARY_EMERGENCY_EMAIL,
       timestampWat: incident.created_at_wat || getWATFormattedDate(),
       timestampIso: incident.created_at || new Date().toISOString(),
     };
@@ -98,7 +104,31 @@ export class RealtimeAlertHub {
       }
     }
 
-    console.log(`[RealtimeAlertHub] 🚨 Broadcasted ${payload.severity} threat "${payload.threatClassification}" to ${this.clients.size} active SOC operator sessions.`);
+    // If no active operator browser sessions are connected (e.g. system asleep/closed), automatically trigger failover reroute to phone & email
+    if (this.clients.size === 0 || notificationDispatcher.getSystemState().state !== 'ONLINE_ACTIVE') {
+      notificationDispatcher
+        .dispatchFailoverAlert({
+          reason: this.clients.size === 0 ? 'OPERATOR_UNREACHABLE' : 'SYSTEM_SLEEP_MODE',
+          systemId: payload.systemId,
+          incident: {
+            id: payload.id,
+            system_id: payload.systemId,
+            threat_classification: payload.threatClassification,
+            severity: payload.severity,
+            offending_ip: payload.offendingIp,
+            geo_city: payload.geoCity,
+            geo_country: payload.geoCountry,
+            asn: payload.asn,
+            http_method: payload.httpMethod,
+            target_endpoint: payload.targetEndpoint,
+            captured_payload: payload.capturedPayload,
+            created_at_wat: payload.timestampWat,
+          },
+        })
+        .catch(() => {});
+    }
+
+    console.log(`[RealtimeAlertHub] 🚨 Broadcasted ${payload.severity} threat "${payload.threatClassification}" to ${this.clients.size} active SOC operator sessions (Failover Armed: ${CONFIG.PRIMARY_EMERGENCY_PHONE} & ${CONFIG.PRIMARY_EMERGENCY_EMAIL}).`);
   }
 
   /**

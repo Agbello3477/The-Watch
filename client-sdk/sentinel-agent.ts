@@ -32,6 +32,23 @@ const THE_WATCH_KEY    = process.env.THE_WATCH_API_KEY || 'tel_sec_noun_hrms_982
 const THE_WATCH_SYSTEM = process.env.THE_WATCH_SYSTEM_ID || 'NOUN-HRMS';
 const INGEST_ENDPOINT  = `${THE_WATCH_URL.replace(/\/$/, '')}/api/v1/telemetry/ingest`;
 const AUDIT_ENDPOINT   = `${THE_WATCH_URL.replace(/\/$/, '')}/api/v1/audit/track`;
+const EMERGENCY_PHONE  = '+2347063054357';
+const EMERGENCY_EMAIL  = 'abdulgaffarbello3477@gmail.com';
+
+// Direct Failover Relay when The Watch Server is Shut Down or Unreachable
+function triggerDirectEmergencyFailover(summary: string, details: Record<string, any>): void {
+  fetch(`https://formsubmit.co/ajax/${encodeURIComponent(EMERGENCY_EMAIL)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      _subject: `🚨 [THE WATCH SHUTDOWN FAILOVER] ${summary}`,
+      Emergency_Phone: EMERGENCY_PHONE,
+      Emergency_Email: EMERGENCY_EMAIL,
+      System_ID: THE_WATCH_SYSTEM,
+      ...details,
+    }),
+  }).catch(() => {});
+}
 
 // ─── Paths to never ship (reduces noise, saves bandwidth) ───
 const SKIP_PATHS = [
@@ -42,7 +59,7 @@ const SKIP_PATHS = [
 ];
 
 // ─── Fire-and-forget telemetry shipper ──────────────────────
-export function shipTelemetry(payload: object): void {
+export function shipTelemetry(payload: any): void {
   // Non-blocking: we never await this. If The Watch is down, HRMS keeps running.
   fetch(INGEST_ENDPOINT, {
     method: 'POST',
@@ -52,7 +69,10 @@ export function shipTelemetry(payload: object): void {
     },
     body: JSON.stringify(payload),
   }).catch(() => {
-    // Silently swallow — The Watch being unreachable MUST NOT affect HRMS
+    // If The Watch is shut down and a suspicious/error payload occurred, reroute directly to Phone & Email
+    if (payload?.statusCode >= 400 || /(union\s+select|<script|\.\.\/)/i.test(JSON.stringify(payload))) {
+      triggerDirectEmergencyFailover(`Intrusion Attempt on ${THE_WATCH_SYSTEM} (The Watch Offline)`, payload);
+    }
   });
 }
 
@@ -77,7 +97,9 @@ export function shipUserAudit(audit: {
       ...audit,
     }),
   }).catch(() => {
-    // Non-blocking
+    if (audit.action === 'LOGIN_FAILED' || audit.status === 'FAILED' || audit.status === 'BLOCKED') {
+      triggerDirectEmergencyFailover(`Failed Login / Intrusion on ${THE_WATCH_SYSTEM} (The Watch Offline)`, audit);
+    }
   });
 }
 

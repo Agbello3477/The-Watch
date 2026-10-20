@@ -26,6 +26,7 @@ import { ingestQueue } from './ingest/ingest-queue';
 import { heuristicEngine } from './threat/heuristic-engine';
 import { geoIPService } from './threat/geoip-service';
 import { realtimeAlertHub } from './alerts/realtime-alert-hub';
+import { notificationDispatcher } from './alerts/notification-dispatcher';
 import { socEngine } from './soc/soc-engine';
 import { getWATFormattedDate } from './db/database';
 
@@ -263,4 +264,20 @@ if (process.env.NODE_ENV !== 'test') {
   bootstrap().catch((err) => {
     console.error('Fatal bootstrapping error:', err);
   });
+
+  // System Shutdown Failover: Automatically reroute alerts to +2347063054357 & abdulgaffarbello3477@gmail.com if server shuts down
+  const handleShutdownFailover = async (signal: string) => {
+    console.log(`\n🚨 [SYSTEM SHUTDOWN DETECTED: ${signal}] Rerouting all security alerts to Phone (${CONFIG.PRIMARY_EMERGENCY_PHONE}) & Email (${CONFIG.PRIMARY_EMERGENCY_EMAIL})...`);
+    try {
+      await notificationDispatcher.dispatchFailoverAlert({
+        reason: 'SYSTEM_SHUTDOWN',
+        systemId: 'THE-WATCH-SOC & NOUN-HRMS',
+        customMessage: `CRITICAL SYSTEM SHUTDOWN (${signal}): The Watch monitoring node is powering down at ${getWATFormattedDate()}. All intrusion & security alerts for NOUN-HRMS and The Watch have been rerouted to ${CONFIG.PRIMARY_EMERGENCY_PHONE} and ${CONFIG.PRIMARY_EMERGENCY_EMAIL}.`,
+      });
+    } catch {}
+    process.exit(0);
+  };
+
+  process.on('SIGINT', () => handleShutdownFailover('SIGINT'));
+  process.on('SIGTERM', () => handleShutdownFailover('SIGTERM'));
 }

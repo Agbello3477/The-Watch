@@ -11,40 +11,46 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({ selectedSystem }
   const [downloadingCsv, setDownloadingCsv] = useState<boolean>(false);
   const [downloadingAuditCsv, setDownloadingAuditCsv] = useState<boolean>(false);
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     setDownloadingPdf(true);
-    api.trackUserAction({
-      action: 'DOWNLOAD',
-      details: `Downloaded PDF Audit Report (${selectedSystem || 'All Monitored Systems'})`,
-      target: 'PDF Forensic Report',
-    });
-    const url = api.getPdfReportUrl(selectedSystem || undefined);
-    window.open(url, '_blank');
-    setTimeout(() => setDownloadingPdf(false), 2000);
+    try {
+      api.trackUserAction({
+        action: 'DOWNLOAD',
+        details: `Downloaded PDF Audit Report (${selectedSystem || 'All Monitored Systems'})`,
+        target: 'PDF Forensic Report',
+      });
+      await api.downloadPdfReport({ systemId: selectedSystem || undefined });
+    } finally {
+      setTimeout(() => setDownloadingPdf(false), 1200);
+    }
   };
 
-  const handleDownloadCsv = () => {
+  const handleDownloadCsv = async () => {
     setDownloadingCsv(true);
-    api.trackUserAction({
-      action: 'DOWNLOAD',
-      details: `Downloaded CSV Threat Incident Logs (${selectedSystem || 'All Monitored Systems'})`,
-      target: 'CSV Forensic Logs',
-    });
-    const url = api.getCsvReportUrl(selectedSystem || undefined);
-    window.open(url, '_blank');
-    setTimeout(() => setDownloadingCsv(false), 2000);
+    try {
+      api.trackUserAction({
+        action: 'DOWNLOAD',
+        details: `Downloaded CSV Threat Incident Logs (${selectedSystem || 'All Monitored Systems'})`,
+        target: 'CSV Forensic Logs',
+      });
+      await api.downloadCsvReport(selectedSystem || undefined);
+    } finally {
+      setTimeout(() => setDownloadingCsv(false), 1200);
+    }
   };
 
-  const handleDownloadAuditCsv = () => {
+  const handleDownloadAuditCsv = async () => {
     setDownloadingAuditCsv(true);
-    api.trackUserAction({
-      action: 'DOWNLOAD',
-      details: `Downloaded User Activity Audit Trail CSV (${selectedSystem || 'All Monitored Systems'})`,
-      target: 'User Audit Trail CSV',
-    });
-    const url = api.getAuditCsvReportUrl(selectedSystem || undefined);
-    window.open(url, '_blank');
-    setTimeout(() => setDownloadingAuditCsv(false), 2000);
+    try {
+      api.trackUserAction({
+        action: 'DOWNLOAD',
+        details: `Downloaded User Activity Audit Trail CSV (${selectedSystem || 'All Monitored Systems'})`,
+        target: 'User Audit Trail CSV',
+      });
+      await api.downloadAuditCsvReport(selectedSystem || undefined);
+    } finally {
+      setTimeout(() => setDownloadingAuditCsv(false), 1200);
+    }
   };
 
   return (

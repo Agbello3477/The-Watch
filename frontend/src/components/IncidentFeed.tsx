@@ -295,7 +295,32 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
                       </button>
 
                       <button
-                        onClick={() => window.open(api.getPdfReportUrl(inc.system_id, inc.id), '_blank')}
+                        onClick={() =>
+                          api.downloadPdfReport({
+                            systemId: inc.system_id,
+                            incidentId: inc.id,
+                            incidentData: {
+                              id: inc.id,
+                              systemId: inc.system_id,
+                              incidentType: inc.incident_type,
+                              threatClassification: inc.threat_classification,
+                              severity: inc.severity,
+                              offendingIp: inc.offending_ip,
+                              geoCity: inc.geo_city,
+                              geoRegion: inc.geo_region,
+                              geoCountry: inc.geo_country,
+                              geoLat: inc.geo_lat,
+                              geoLng: inc.geo_lng,
+                              asn: inc.asn,
+                              isp: inc.isp,
+                              targetEndpoint: inc.target_endpoint,
+                              httpMethod: inc.http_method,
+                              capturedPayload: inc.captured_payload,
+                              status: inc.status,
+                              timestampWat: inc.created_at_wat,
+                            },
+                          })
+                        }
                         title="Download Forensic Incident Report (PDF)"
                         className="p-1.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 transition cursor-pointer"
                       >
@@ -493,7 +518,32 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
                   <span>Trace IP Origin</span>
                 </button>
                 <button
-                  onClick={() => window.open(api.getPdfReportUrl(selectedIncident.system_id, selectedIncident.id), '_blank')}
+                  onClick={() =>
+                    api.downloadPdfReport({
+                      systemId: selectedIncident.system_id,
+                      incidentId: selectedIncident.id,
+                      incidentData: {
+                        id: selectedIncident.id,
+                        systemId: selectedIncident.system_id,
+                        incidentType: selectedIncident.incident_type,
+                        threatClassification: selectedIncident.threat_classification,
+                        severity: selectedIncident.severity,
+                        offendingIp: selectedIncident.offending_ip,
+                        geoCity: selectedIncident.geo_city,
+                        geoRegion: selectedIncident.geo_region,
+                        geoCountry: selectedIncident.geo_country,
+                        geoLat: selectedIncident.geo_lat,
+                        geoLng: selectedIncident.geo_lng,
+                        asn: selectedIncident.asn,
+                        isp: selectedIncident.isp,
+                        targetEndpoint: selectedIncident.target_endpoint,
+                        httpMethod: selectedIncident.http_method,
+                        capturedPayload: selectedIncident.captured_payload,
+                        status: selectedIncident.status,
+                        timestampWat: selectedIncident.created_at_wat,
+                      },
+                    })
+                  }
                   className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <FileText className="w-3.5 h-3.5" />

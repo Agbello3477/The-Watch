@@ -5,25 +5,26 @@ import {
   Volume2,
   VolumeX,
   X,
-  Zap,
   CheckCircle2,
   ExternalLink,
   Radio,
   Clock,
-  Globe,
   Database,
   Lock,
   Crosshair,
   Ban,
   Download,
   FileText,
-  FileSpreadsheet,
   BellRing,
   MapPin,
-  Server,
-  Activity,
+  Smartphone,
+  Mail,
+  ShieldCheck,
 } from 'lucide-react';
 import { api } from '../services/api';
+
+export const EMERGENCY_PHONE = '+2347063054357';
+export const EMERGENCY_EMAIL = 'abdulgaffarbello3477@gmail.com';
 
 export interface LiveThreatAlert {
   id: string;
@@ -46,6 +47,8 @@ export interface LiveThreatAlert {
   status: 'UNRESOLVED' | 'ACKNOWLEDGED' | 'RESOLVED';
   mitigationBlueprint?: string;
   remediationSummary?: string;
+  reroutedToPhone?: string;
+  reroutedToEmail?: string;
   timestampWat: string;
   timestampIso: string;
 }
@@ -99,8 +102,9 @@ interface RealtimeThreatAlertPromptProps {
   onAlertNeutralized?: (alertId: string) => void;
 }
 
-// Persistent shared Web Audio Context for maximum loudness wake-up alarm
+// Persistent shared Web Audio Context + Sleep-Mode Keep-Alive Carrier
 let sharedAudioCtx: AudioContext | null = null;
+let keepAliveOscillator: OscillatorNode | null = null;
 
 function getOrInitAudioContext(): AudioContext | null {
   try {
@@ -112,6 +116,20 @@ function getOrInitAudioContext(): AudioContext | null {
     if (sharedAudioCtx.state === 'suspended') {
       sharedAudioCtx.resume().catch(() => {});
     }
+
+    // Start ultra-low sub-audible keep-alive carrier so the OS does not suspend the hardware audio channel during sleep/lock mode
+    if (!keepAliveOscillator && sharedAudioCtx.state === 'running') {
+      try {
+        keepAliveOscillator = sharedAudioCtx.createOscillator();
+        const silentGain = sharedAudioCtx.createGain();
+        keepAliveOscillator.frequency.setValueAtTime(20, sharedAudioCtx.currentTime);
+        silentGain.gain.setValueAtTime(0.00005, sharedAudioCtx.currentTime);
+        keepAliveOscillator.connect(silentGain);
+        silentGain.connect(sharedAudioCtx.destination);
+        keepAliveOscillator.start();
+      } catch {}
+    }
+
     return sharedAudioCtx;
   } catch {
     return null;
@@ -120,26 +138,30 @@ function getOrInitAudioContext(): AudioContext | null {
 
 /**
  * High-Decibel Wake-Up Intrusion Klaxon Siren
- * Uses multi-oscillator sawtooth + square wave + dynamics compressor at maximum gain (0.95)
- * Designed to wake up a sleeping SOC operator immediately upon any intrusion attempt.
+ * Uses multi-oscillator sawtooth + square wave + dynamics compressor at maximum gain (0.98)
+ * Designed to wake up a sleeping SOC operator even when the screen is locked or in standby mode.
  */
 export function playWakeUpKlaxonCycle() {
   try {
     const ctx = getOrInitAudioContext();
     if (!ctx) return;
 
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
     const now = ctx.currentTime;
 
     // Dynamics Compressor to maximize perceived loudness without distortion
     const compressor = ctx.createDynamicsCompressor();
-    compressor.threshold.setValueAtTime(-14, now);
+    compressor.threshold.setValueAtTime(-16, now);
     compressor.knee.setValueAtTime(0, now);
     compressor.ratio.setValueAtTime(20, now);
     compressor.attack.setValueAtTime(0.001, now);
     compressor.release.setValueAtTime(0.05, now);
 
     const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.95, now);
+    masterGain.gain.setValueAtTime(0.98, now);
     compressor.connect(masterGain);
     masterGain.connect(ctx.destination);
 
@@ -148,13 +170,13 @@ export function playWakeUpKlaxonCycle() {
     const gain1 = ctx.createGain();
     osc1.type = 'sawtooth';
     osc1.frequency.setValueAtTime(740, now);
-    osc1.frequency.linearRampToValueAtTime(1680, now + 0.45);
+    osc1.frequency.linearRampToValueAtTime(1720, now + 0.45);
     osc1.frequency.linearRampToValueAtTime(740, now + 0.75);
-    osc1.frequency.linearRampToValueAtTime(1820, now + 1.15);
+    osc1.frequency.linearRampToValueAtTime(1860, now + 1.15);
     osc1.frequency.linearRampToValueAtTime(880, now + 1.35);
 
-    gain1.gain.setValueAtTime(0.85, now);
-    gain1.gain.setValueAtTime(0.85, now + 1.25);
+    gain1.gain.setValueAtTime(0.9, now);
+    gain1.gain.setValueAtTime(0.9, now + 1.25);
     gain1.gain.exponentialRampToValueAtTime(0.01, now + 1.38);
 
     osc1.connect(gain1);
@@ -171,8 +193,8 @@ export function playWakeUpKlaxonCycle() {
     osc2.frequency.setValueAtTime(1760, now + 0.8);
     osc2.frequency.setValueAtTime(1975, now + 1.0);
 
-    gain2.gain.setValueAtTime(0.65, now);
-    gain2.gain.setValueAtTime(0.65, now + 1.25);
+    gain2.gain.setValueAtTime(0.75, now);
+    gain2.gain.setValueAtTime(0.75, now + 1.25);
     gain2.gain.exponentialRampToValueAtTime(0.01, now + 1.38);
 
     osc2.connect(gain2);
@@ -187,7 +209,7 @@ export function playWakeUpKlaxonCycle() {
     osc3.frequency.linearRampToValueAtTime(440, now + 0.75);
     osc3.frequency.linearRampToValueAtTime(932, now + 1.15);
 
-    gain3.gain.setValueAtTime(0.75, now);
+    gain3.gain.setValueAtTime(0.8, now);
     gain3.gain.exponentialRampToValueAtTime(0.01, now + 1.38);
 
     osc3.connect(gain3);
@@ -213,21 +235,41 @@ function speakIntrusionVoiceAlert(alert: LiveThreatAlert) {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const origin = [alert.geoCity, alert.geoCountry].filter(Boolean).join(', ') || 'Unknown Location';
-    const text = `Emergency Security Alert! Intrusion attempt detected on ${alert.systemId}. Attack type: ${alert.threatClassification}. Originating from ${origin}, IP address ${alert.offendingIp}. Immediate action required!`;
+    const text = `Emergency Security Alert! Intrusion attempt detected on ${alert.systemId}. Attack type: ${alert.threatClassification}. Originating from ${origin}, IP address ${alert.offendingIp}. Alert also routed to phone ${EMERGENCY_PHONE} and email.`;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.volume = 1.0;
     utterance.rate = 1.02;
     utterance.pitch = 1.05;
     window.speechSynthesis.speak(utterance);
-  } catch {
-    // Ignore speech synthesis errors on unsupported browsers
-  }
+  } catch {}
 }
 
 function stopVoiceAlert() {
   try {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
+    }
+  } catch {}
+}
+
+/**
+ * Triggers OS-level Desktop & Lock-Screen Notification with Vibration
+ */
+function triggerOsSleepNotification(alert: LiveThreatAlert) {
+  try {
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification(`🚨 INTRUSION ALERT [${alert.systemId}]: ${alert.threatClassification}`, {
+          body: `Attacker IP: ${alert.offendingIp} (${alert.geoCity || 'Unknown'}, ${alert.geoCountry || 'Unknown'}) at ${alert.timestampWat}. Rerouted to ${EMERGENCY_PHONE} & ${EMERGENCY_EMAIL}.`,
+          requireInteraction: true,
+          tag: alert.id,
+        });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
+    }
+    if ('vibrate' in navigator) {
+      navigator.vibrate([600, 200, 600, 200, 1000]);
     }
   } catch {}
 }
@@ -241,10 +283,17 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
     return localStorage.getItem('the_watch_alert_sound_muted') === 'true';
   });
   const [isSirenRinging, setIsSirenRinging] = useState<boolean>(false);
+  const [wakeLockActive, setWakeLockActive] = useState<boolean>(false);
   const [neutralizingIds, setNeutralizingIds] = useState<Set<string>>(new Set());
   const [neutralizedSuccessIds, setNeutralizedSuccessIds] = useState<Set<string>>(new Set());
   const [blockedIps, setBlockedIps] = useState<Set<string>>(new Set());
   const [isConnected, setIsConnected] = useState<boolean>(false);
+
+  // Downloading & Rerouting Feedback States
+  const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null);
+  const [downloadingCsvId, setDownloadingCsvId] = useState<string | null>(null);
+  const [reroutingAlertId, setReroutingAlertId] = useState<string | null>(null);
+  const [rerouteConfirmation, setRerouteConfirmation] = useState<Record<string, string>>({});
 
   // IP Trace state per alert ID
   const [tracingAlertId, setTracingAlertId] = useState<string | null>(null);
@@ -254,21 +303,91 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
   const lastTimestampRef = useRef<string>(new Date(Date.now() - 30000).toISOString());
   const sirenLoopRef = useRef<any>(null);
   const voiceLoopRef = useRef<any>(null);
+  const wakeLockSentinelRef = useRef<any>(null);
 
-  // Unlock Web Audio Context on first user interaction anywhere on the page
+  // 1. Hardware Screen & Sleep Wake-Lock + Sleep/Shutdown Failover Listeners
   useEffect(() => {
-    const unlockAudio = () => {
-      getOrInitAudioContext();
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLockSentinelRef.current = await (navigator as any).wakeLock.request('screen');
+          setWakeLockActive(true);
+          wakeLockSentinelRef.current.addEventListener('release', () => {
+            setWakeLockActive(false);
+          });
+        }
+      } catch {
+        setWakeLockActive(false);
+      }
     };
-    window.addEventListener('click', unlockAudio, { once: true, passive: true });
-    window.addEventListener('keydown', unlockAudio, { once: true, passive: true });
+
+    requestWakeLock();
+
+    const unlockAudioAndNotifications = () => {
+      getOrInitAudioContext();
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
+      if (!wakeLockSentinelRef.current) {
+        requestWakeLock();
+      }
+    };
+
+    window.addEventListener('click', unlockAudioAndNotifications, { passive: true });
+    window.addEventListener('keydown', unlockAudioAndNotifications, { passive: true });
+
+    // Detect when system enters sleep/standby mode or wakes up
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        requestWakeLock();
+        getOrInitAudioContext();
+        api.rerouteAlertToMobileAndEmail({ reason: 'ONLINE_ACTIVE' }).catch(() => {});
+      } else {
+        // System screen locked or entering sleep mode -> activate automatic mobile/email failover
+        api
+          .rerouteAlertToMobileAndEmail({
+            reason: 'SYSTEM_SLEEP_MODE',
+            systemId: 'THE-WATCH-SOC & NOUN-HRMS',
+            customMessage: `System entered sleep/standby mode. Active intrusion alerts automatically routed to ${EMERGENCY_PHONE} and ${EMERGENCY_EMAIL}.`,
+          })
+          .catch(() => {});
+      }
+    };
+
+    // Detect when system/browser is shutting down or closing -> sendBeacon to reroute all alerts to phone & email
+    const handleShutdownOrUnload = () => {
+      try {
+        const rawApiUrl = (import.meta as any).env?.VITE_API_URL || '';
+        const API_BASE = rawApiUrl ? `${rawApiUrl.replace(/\/$/, '')}/api/v1` : '/api/v1';
+        const payload = JSON.stringify({
+          reason: 'SYSTEM_SHUTDOWN',
+          systemId: 'THE-WATCH-SOC & NOUN-HRMS',
+          customMessage: `System shutdown / session termination detected. All security intrusion alerts rerouted to ${EMERGENCY_PHONE} and ${EMERGENCY_EMAIL}.`,
+        });
+        if (navigator.sendBeacon) {
+          const blob = new Blob([payload], { type: 'application/json' });
+          navigator.sendBeacon(`${API_BASE}/threats/reroute-alert`, blob);
+        }
+      } catch {}
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleShutdownOrUnload);
+    window.addEventListener('pagehide', handleShutdownOrUnload);
+
     return () => {
-      window.removeEventListener('click', unlockAudio);
-      window.removeEventListener('keydown', unlockAudio);
+      window.removeEventListener('click', unlockAudioAndNotifications);
+      window.removeEventListener('keydown', unlockAudioAndNotifications);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleShutdownOrUnload);
+      window.removeEventListener('pagehide', handleShutdownOrUnload);
+      if (wakeLockSentinelRef.current) {
+        wakeLockSentinelRef.current.release().catch(() => {});
+      }
     };
   }, []);
 
-  // Manage Continuous Wake-Up Siren Loop whenever there is an active un-silenced alert
+  // 2. Manage Continuous Wake-Up Siren Loop whenever there is an active un-silenced alert
   useEffect(() => {
     if (sirenLoopRef.current) {
       clearInterval(sirenLoopRef.current);
@@ -280,11 +399,11 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
     }
 
     if (isSirenRinging && !isMuted && alerts.length > 0) {
-      // Play immediately
       playWakeUpKlaxonCycle();
       speakIntrusionVoiceAlert(alerts[0]);
+      triggerOsSleepNotification(alerts[0]);
 
-      // Repeat piercing klaxon every 1.45 seconds continuously so the user wakes up!
+      // Repeat piercing klaxon every 1.45 seconds continuously so the user wakes up even from sleep!
       sirenLoopRef.current = setInterval(() => {
         playWakeUpKlaxonCycle();
       }, 1450);
@@ -321,6 +440,53 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
     });
   };
 
+  const handleRerouteToPhoneAndEmail = async (alert: LiveThreatAlert, openWhatsApp = false) => {
+    setReroutingAlertId(alert.id);
+    try {
+      await api.rerouteAlertToMobileAndEmail({
+        reason: 'MANUAL_MOBILE_REROUTE',
+        systemId: alert.systemId,
+        incident: {
+          id: alert.id,
+          system_id: alert.systemId,
+          threat_classification: alert.threatClassification,
+          severity: alert.severity,
+          offending_ip: alert.offendingIp,
+          geo_city: alert.geoCity,
+          geo_country: alert.geoCountry,
+          asn: alert.asn,
+          http_method: alert.httpMethod,
+          target_endpoint: alert.targetEndpoint,
+          captured_payload: alert.capturedPayload,
+          created_at_wat: alert.timestampWat,
+        },
+      });
+
+      const watTime = new Date().toLocaleTimeString('en-GB', { timeZone: 'Africa/Lagos' });
+      setRerouteConfirmation((prev) => ({
+        ...prev,
+        [alert.id]: `✓ Dispatched to ${EMERGENCY_PHONE} & ${EMERGENCY_EMAIL} at ${watTime} WAT`,
+      }));
+
+      if (openWhatsApp) {
+        const msg = encodeURIComponent(
+          `🚨 *THE WATCH EMERGENCY INTRUSION ALERT*\n` +
+            `*Target System:* ${alert.systemId}\n` +
+            `*Attack Type:* ${alert.threatClassification} (${alert.incidentType})\n` +
+            `*Severity:* ${alert.severity}\n` +
+            `*Attacker IP:* ${alert.offendingIp}\n` +
+            `*Origin:* ${alert.geoCity || 'Unknown'}, ${alert.geoCountry || 'Unknown'} (${alert.asn || 'AS0'})\n` +
+            `*Endpoint:* ${alert.httpMethod} ${alert.targetEndpoint}\n` +
+            `*Attempt Payload:* ${alert.capturedPayload}\n` +
+            `*Time (WAT):* ${alert.timestampWat}`
+        );
+        window.open(`https://wa.me/2347063054357?text=${msg}`, '_blank');
+      }
+    } finally {
+      setReroutingAlertId(null);
+    }
+  };
+
   const handleTestWakeUpSiren = () => {
     setIsMuted(false);
     localStorage.setItem('the_watch_alert_sound_muted', 'false');
@@ -347,6 +513,8 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
       status: 'UNRESOLVED',
       mitigationBlueprint: 'iptables -I INPUT -s 194.26.29.112 -j DROP',
       remediationSummary: 'Critical SQL Injection attempt intercepted targeting NOUN HRMS payroll export endpoint.',
+      reroutedToPhone: EMERGENCY_PHONE,
+      reroutedToEmail: EMERGENCY_EMAIL,
       timestampWat: new Date().toLocaleString('en-GB', {
         timeZone: 'Africa/Lagos',
         dateStyle: 'full',
@@ -357,6 +525,28 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
 
     setAlerts((prev) => [demoAlert, ...prev.slice(0, 2)]);
     setIsSirenRinging(true);
+
+    // Also dispatch failover notification to phone & email
+    api
+      .rerouteAlertToMobileAndEmail({
+        reason: 'MANUAL_MOBILE_REROUTE',
+        systemId: demoAlert.systemId,
+        incident: {
+          id: demoAlert.id,
+          system_id: demoAlert.systemId,
+          threat_classification: demoAlert.threatClassification,
+          severity: demoAlert.severity,
+          offending_ip: demoAlert.offendingIp,
+          geo_city: demoAlert.geoCity,
+          geo_country: demoAlert.geoCountry,
+          asn: demoAlert.asn,
+          http_method: demoAlert.httpMethod,
+          target_endpoint: demoAlert.targetEndpoint,
+          captured_payload: demoAlert.capturedPayload,
+          created_at_wat: demoAlert.timestampWat,
+        },
+      })
+      .catch(() => {});
   };
 
   const pushAlert = useCallback((alert: LiveThreatAlert) => {
@@ -437,9 +627,7 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
             });
           }
         }
-      } catch {
-        // Silent catch on offline/dev network switch
-      }
+      } catch {}
     };
 
     connectSSE();
@@ -485,7 +673,6 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
     stopVoiceAlert();
 
     try {
-      // 1. Block IP on active SOC Firewall for 720 hours (30 days)
       await api.blockIp({
         ip: alert.offendingIp,
         reason: `Intrusion Blocked: ${alert.threatClassification} on ${alert.systemId} (${alert.targetEndpoint})`,
@@ -494,7 +681,6 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
         durationHours: 720,
       });
 
-      // 2. Resolve incident if it's a real DB incident
       if (!alert.id.startsWith('inc-wakeup-test-')) {
         await api.updateIncidentStatus(alert.id, 'RESOLVED');
       }
@@ -513,21 +699,32 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
     }
   };
 
-  const handleDownloadIncidentPdf = (alert: LiveThreatAlert) => {
-    const incidentIdParam = alert.id.startsWith('inc-wakeup-test-') ? undefined : alert.id;
-    const url = api.getPdfReportUrl(alert.systemId, incidentIdParam);
-    window.open(url, '_blank');
+  const handleDownloadIncidentPdf = async (alert: LiveThreatAlert) => {
+    setDownloadingPdfId(alert.id);
+    try {
+      await api.downloadPdfReport({
+        systemId: alert.systemId,
+        incidentId: alert.id,
+        incidentData: alert,
+      });
+    } finally {
+      setTimeout(() => setDownloadingPdfId(null), 1000);
+    }
   };
 
-  const handleDownloadAuditCsv = (alert: LiveThreatAlert) => {
-    const url = api.getCsvReportUrl(alert.systemId);
-    window.open(url, '_blank');
+  const handleDownloadAuditCsv = async (alert: LiveThreatAlert) => {
+    setDownloadingCsvId(alert.id);
+    try {
+      await api.downloadCsvReport(alert.systemId);
+    } finally {
+      setTimeout(() => setDownloadingCsvId(null), 1000);
+    }
   };
 
   return (
     <>
-      {/* Persistent Bottom-Right Wake-Up Siren Status & Test Bar */}
-      <div className="fixed bottom-4 right-4 z-40 flex items-center gap-2 bg-slate-950/95 border border-rose-500/50 rounded-full px-3.5 py-1.5 shadow-xl shadow-rose-950/50 backdrop-blur-md">
+      {/* Persistent Bottom-Right Wake-Up Siren & Sleep/Shutdown Failover Guard Bar */}
+      <div className="fixed bottom-4 right-4 z-40 flex flex-wrap items-center gap-2 bg-slate-950/95 border border-rose-500/50 rounded-full px-3.5 py-1.5 shadow-xl shadow-rose-950/50 backdrop-blur-md">
         <span className="relative flex h-2.5 w-2.5">
           <span
             className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -540,8 +737,8 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
             }`}
           />
         </span>
-        <span className="text-[11px] font-mono font-bold text-slate-200 hidden sm:inline">
-          24/7 INTRUSION GUARD
+        <span className="text-[10px] font-mono font-bold text-emerald-300 hidden md:inline">
+          SLEEP-GUARD {wakeLockActive ? 'LOCKED' : 'ARMED'} • FAILOVER: {EMERGENCY_PHONE}
         </span>
         <button
           onClick={handleToggleMute}
@@ -550,7 +747,7 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
               ? 'bg-rose-950 text-rose-300 border border-rose-700'
               : 'bg-emerald-950 text-emerald-300 border border-emerald-700'
           }`}
-          title={isMuted ? 'Click to enable loud wake-up siren' : 'Loud wake-up siren is ARMED'}
+          title={isMuted ? 'Click to enable loud wake-up siren' : 'Loud wake-up siren is ARMED (including Sleep Mode)'}
         >
           {isMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
           <span>{isMuted ? 'SIREN MUTED' : 'SIREN ARMED'}</span>
@@ -558,7 +755,7 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
         <button
           onClick={handleTestWakeUpSiren}
           className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-md shadow-rose-600/30 flex items-center gap-1 transition cursor-pointer"
-          title="Trigger a test intrusion alert with the loud wake-up klaxon siren"
+          title="Trigger a test intrusion alert with the loud wake-up klaxon siren & mobile failover"
         >
           <BellRing className="w-3 h-3 animate-bounce" />
           <span>TEST WAKE-UP ALARM</span>
@@ -583,6 +780,9 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
               const isIpBlocked = blockedIps.has(alert.offendingIp) || isNeutralized;
               const traceData = traceResults[alert.id];
               const isTracing = tracingAlertId === alert.id;
+              const isDownloadingPdf = downloadingPdfId === alert.id;
+              const isDownloadingCsv = downloadingCsvId === alert.id;
+              const isRerouting = reroutingAlertId === alert.id;
 
               const fullOriginLocation = [
                 alert.geoCity || 'Unknown City',
@@ -638,7 +838,7 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
                           </span>
                         </div>
                         <div className="text-[11px] font-mono text-rose-200/90 mt-0.5">
-                          Active 24/7 Threat Sentinel — National Open University of Nigeria (NOUN)
+                          Active 24/7 Threat Sentinel — Sleep-Mode Wake-Up Siren & Shutdown Mobile Failover Armed
                         </div>
                       </div>
                     </div>
@@ -672,6 +872,50 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
 
                   {/* Main Intrusion Forensic Body */}
                   <div className="p-4 sm:p-5 space-y-4">
+                    {/* Sleep / Shutdown Phone & Email Failover Routing Banner */}
+                    <div className="bg-emerald-950/60 border border-emerald-500/50 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 font-mono text-xs">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 text-emerald-300 font-bold text-[11px]">
+                          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>AUTO-FAILOVER & SLEEP/SHUTDOWN REROUTE ACTIVE:</span>
+                        </div>
+                        <div className="text-[11px] text-slate-200 flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span className="flex items-center gap-1 text-amber-300 font-bold">
+                            <Smartphone className="w-3.5 h-3.5" /> {EMERGENCY_PHONE}
+                          </span>
+                          <span className="flex items-center gap-1 text-cyan-300 font-bold">
+                            <Mail className="w-3.5 h-3.5" /> {EMERGENCY_EMAIL}
+                          </span>
+                        </div>
+                        {rerouteConfirmation[alert.id] && (
+                          <div className="text-[10px] text-emerald-400 font-bold">
+                            {rerouteConfirmation[alert.id]}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleRerouteToPhoneAndEmail(alert, true)}
+                          disabled={isRerouting}
+                          className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-[10px] flex items-center gap-1 shadow cursor-pointer transition"
+                          title="Send immediately to +2347063054357 via SMS/WhatsApp & Email"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          <span>{isRerouting ? 'ROUTING...' : 'ALERT PHONE (+2347063054357)'}</span>
+                        </button>
+                        <button
+                          onClick={() => handleRerouteToPhoneAndEmail(alert, false)}
+                          disabled={isRerouting}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 font-bold text-[10px] flex items-center gap-1 cursor-pointer transition"
+                          title="Dispatch full forensic alert to abdulgaffarbello3477@gmail.com"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                          <span>SEND EMAIL</span>
+                        </button>
+                      </div>
+                    </div>
+
                     {/* 1. Attack Type & Classification */}
                     <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
@@ -790,7 +1034,6 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
                           </span>
                         </div>
 
-                        {/* Whois & Registry Metadata */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] bg-slate-950 p-2.5 rounded-lg border border-slate-800">
                           <div>
                             <span className="text-slate-500 block text-[10px]">REVERSE DNS</span>
@@ -810,7 +1053,6 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
                           </div>
                         </div>
 
-                        {/* Hop-by-Hop Network Path */}
                         <div className="space-y-1">
                           <div className="text-[10px] text-slate-400 uppercase font-bold">
                             Hop-by-Hop Packet Path (NOUN SOC Gateway → Attacker Host):
@@ -828,7 +1070,14 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
                               </thead>
                               <tbody className="divide-y divide-slate-800/60">
                                 {traceData.hops.map((h) => (
-                                  <tr key={h.hop} className={h.hop === traceData.hops.length ? 'text-rose-300 font-bold' : 'text-slate-300'}>
+                                  <tr
+                                    key={h.hop}
+                                    className={
+                                      h.hop === traceData.hops.length
+                                        ? 'text-rose-300 font-bold'
+                                        : 'text-slate-300'
+                                    }
+                                  >
                                     <td className="py-1 pr-2">#{h.hop}</td>
                                     <td className="py-1 pr-2 text-amber-300">{h.ip}</td>
                                     <td className="py-1 pr-2 truncate max-w-[160px]">{h.hostname}</td>
@@ -845,7 +1094,6 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
 
                     {/* 5. Tactical Command Buttons: TRACE IP, BLOCK IP, DOWNLOAD PDF/CSV REPORT */}
                     <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                      {/* Trace IP Button */}
                       <button
                         onClick={() => handleTraceIp(alert)}
                         disabled={isTracing}
@@ -855,7 +1103,6 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
                         <span>{isTracing ? 'TRACING IP...' : 'TRACE IP ORIGIN'}</span>
                       </button>
 
-                      {/* Block IP & Neutralize Button */}
                       <button
                         onClick={() => handleBlockAndNeutralize(alert)}
                         disabled={isNeutralizing || isIpBlocked}
@@ -878,22 +1125,22 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
                         )}
                       </button>
 
-                      {/* Download Forensic PDF Report */}
                       <button
                         onClick={() => handleDownloadIncidentPdf(alert)}
+                        disabled={isDownloadingPdf}
                         className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-mono font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition cursor-pointer"
                       >
                         <FileText className="w-4 h-4" />
-                        <span>DOWNLOAD REPORT (PDF)</span>
+                        <span>{isDownloadingPdf ? 'DOWNLOADING PDF...' : 'DOWNLOAD REPORT (PDF)'}</span>
                       </button>
 
-                      {/* Download Audit CSV */}
                       <button
                         onClick={() => handleDownloadAuditCsv(alert)}
+                        disabled={isDownloadingCsv}
                         className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-mono font-bold bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 transition cursor-pointer"
                       >
                         <Download className="w-4 h-4" />
-                        <span>EXPORT AUDIT (CSV)</span>
+                        <span>{isDownloadingCsv ? 'EXPORTING CSV...' : 'EXPORT AUDIT (CSV)'}</span>
                       </button>
                     </div>
                   </div>

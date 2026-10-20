@@ -3,6 +3,8 @@ import { db, getWATFormattedDate } from '../db/database';
 import { geoIPService } from '../threat/geoip-service';
 import { realtimeAlertHub } from '../alerts/realtime-alert-hub';
 import { socEngine } from '../soc/soc-engine';
+import { notificationDispatcher } from '../alerts/notification-dispatcher';
+import { CONFIG } from '../config';
 
 export const threatsRouter = Router();
 
@@ -166,5 +168,59 @@ threatsRouter.get('/trace/:ip', async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: 'TRACE_FAILED', message: err.message });
   }
+});
+
+/**
+ * Re-routes intrusion alerts to Phone (+2347063054357) & Email (abdulgaffarbello3477@gmail.com)
+ * Triggered automatically on System Sleep, System Shutdown, or Manual Emergency Forward
+ */
+threatsRouter.post('/reroute-alert', async (req: Request, res: Response) => {
+  try {
+    const { reason, systemId, incident, customMessage } = req.body || {};
+    const validReason =
+      reason === 'SYSTEM_SLEEP_MODE' ||
+      reason === 'SYSTEM_SHUTDOWN' ||
+      reason === 'OPERATOR_UNREACHABLE' ||
+      reason === 'MANUAL_MOBILE_REROUTE'
+        ? reason
+        : 'MANUAL_MOBILE_REROUTE';
+
+    if (reason === 'ONLINE_ACTIVE') {
+      notificationDispatcher.setSystemState('ONLINE_ACTIVE');
+      res.json({
+        success: true,
+        state: 'ONLINE_ACTIVE',
+        phone: CONFIG.PRIMARY_EMERGENCY_PHONE,
+        email: CONFIG.PRIMARY_EMERGENCY_EMAIL,
+      });
+      return;
+    }
+
+    const log = await notificationDispatcher.dispatchFailoverAlert({
+      reason: validReason,
+      systemId: systemId || 'NOUN-HRMS',
+      incident,
+      customMessage,
+    });
+
+    res.json({
+      success: true,
+      phone: CONFIG.PRIMARY_EMERGENCY_PHONE,
+      email: CONFIG.PRIMARY_EMERGENCY_EMAIL,
+      dispatchLog: log,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'REROUTE_FAILED', message: err.message });
+  }
+});
+
+/**
+ * Returns failover status & mobile/email dispatch history
+ */
+threatsRouter.get('/failover-logs', (_req: Request, res: Response) => {
+  res.json({
+    ...notificationDispatcher.getSystemState(),
+    history: notificationDispatcher.getHistory(),
+  });
 });
 

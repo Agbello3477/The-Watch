@@ -32,7 +32,10 @@ export const CONFIG = {
   DATABASE_URL: process.env.DATABASE_URL || '',
   REDIS_URL: process.env.REDIS_URL || '',
   HMAC_SECRET: process.env.HMAC_SECRET || 'the-watch-enterprise-hmac-master-key-2026',
+  PRIMARY_EMERGENCY_PHONE: process.env.PRIMARY_EMERGENCY_PHONE || '+2347063054357',
+  PRIMARY_EMERGENCY_EMAIL: process.env.PRIMARY_EMERGENCY_EMAIL || 'abdulgaffarbello3477@gmail.com',
   ALERT_EMAIL_RECIPIENTS: [
+    'abdulgaffarbello3477@gmail.com',
     'admin@institution.edu.ng',
     'it-security-director@institution.edu.ng'
   ],

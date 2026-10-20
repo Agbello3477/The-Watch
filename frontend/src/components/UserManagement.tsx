@@ -406,7 +406,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
               <button
                 onClick={() => {
                   const scope = auditSystemFilter === 'ALL' ? undefined : auditSystemFilter;
-                  window.open(api.getPdfReportUrl(scope), '_blank');
+                  api.downloadPdfReport({ systemId: scope });
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-mono font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition cursor-pointer"
                 title="Download Full Security & Audit Report (PDF)"
@@ -417,7 +417,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
               <button
                 onClick={() => {
                   const scope = auditSystemFilter === 'ALL' ? undefined : auditSystemFilter;
-                  window.open(api.getAuditCsvReportUrl(scope), '_blank');
+                  api.downloadAuditCsvReport(scope);
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-mono font-bold bg-emerald-600 hover:bg-emerald-500 text-slate-950 shadow-md shadow-emerald-600/20 transition cursor-pointer"
                 title="Download User Activity Audit Trail (CSV)"

@@ -27,6 +27,7 @@ export class ForensicPdfReportGenerator {
       const doc = new PDFDocument({
         size: 'A4',
         margin: 40,
+        bufferPages: true,
         info: {
           Title: reportTitle,
           Author: 'The Watch Threat Intelligence Platform (Powered by MaSha Tech Innovations)',
@@ -245,19 +246,24 @@ export class ForensicPdfReportGenerator {
       }
 
       // Footer
-      const totalPages = doc.bufferedPageRange().count;
-      for (let p = 0; p < totalPages; p++) {
-        doc.switchToPage(p);
-        doc.rect(40, 790, 515.28, 0.5).fill('#cbd5e1');
-        doc.fillColor('#94a3b8').fontSize(7).font('Helvetica')
-          .text(
-            'THE WATCH OBSERVABILITY GATEWAY | POWERED BY: MASHA TECH INNOVATIONS | NATIONAL OPEN UNIVERSITY SOC',
-            40,
-            800,
-            { align: 'left', width: 410 }
-          );
-        doc.fillColor('#94a3b8').fontSize(7).font('Helvetica')
-          .text(`PAGE ${p + 1} OF ${totalPages}`, 460, 800, { align: 'right', width: 95 });
+      try {
+        const range = doc.bufferedPageRange();
+        const totalPages = range.count;
+        for (let p = 0; p < totalPages; p++) {
+          doc.switchToPage(range.start + p);
+          doc.rect(40, 782, 515.28, 0.5).fill('#cbd5e1');
+          doc.fillColor('#94a3b8').fontSize(7).font('Helvetica')
+            .text(
+              'THE WATCH OBSERVABILITY GATEWAY | POWERED BY: MASHA TECH INNOVATIONS | NATIONAL OPEN UNIVERSITY SOC',
+              40,
+              790,
+              { align: 'left', width: 410, lineBreak: false }
+            );
+          doc.fillColor('#94a3b8').fontSize(7).font('Helvetica')
+            .text(`PAGE ${p + 1} OF ${totalPages}`, 460, 790, { align: 'right', width: 95, lineBreak: false });
+        }
+      } catch (footerErr) {
+        console.warn('[PDFGenerator] Non-fatal footer pagination warning:', footerErr);
       }
 
       doc.end();
