@@ -3,6 +3,8 @@ import { authService } from '../auth/auth-service';
 import { db, UserAuditLog, getWATFormattedDate } from '../db/database';
 import { geoIPService } from '../threat/geoip-service';
 import { realtimeAlertHub } from '../alerts/realtime-alert-hub';
+import { heuristicEngine } from '../threat/heuristic-engine';
+import { socEngine } from '../soc/soc-engine';
 
 export const auditRouter = Router();
 
@@ -79,6 +81,55 @@ auditRouter.post('/track', async (req: Request, res: Response) => {
     // 5. Persist to DB and broadcast via SSE in real time
     await db.saveUserAuditLog(auditLog);
     realtimeAlertHub.broadcastAuditLog(auditLog);
+
+    // 6. If this event is an intrusion attempt (LOGIN_FAILED, BLOCKED, or malicious payload) on NOUN-HRMS or monitored system, trigger loud real-time threat alert!
+    const heuristicCheck = heuristicEngine.evaluate({
+      method: 'POST',
+      path: target || '/auth/login',
+      payload: `${details || ''} ${target || ''} ${email || ''}`,
+      userAgent: req.headers['user-agent'],
+      clientIp: ipAddress,
+    });
+
+    if (action === 'LOGIN_FAILED' || bodyStatus === 'FAILED' || bodyStatus === 'BLOCKED' || heuristicCheck.detected) {
+      const incident = {
+        id: `inc-hrms-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        system_id: systemId || 'NOUN-HRMS',
+        incident_type: heuristicCheck.detected ? heuristicCheck.incidentType : 'INTRUSION_ATTEMPT',
+        threat_classification: heuristicCheck.detected
+          ? heuristicCheck.threatClassification
+          : `Unauthorized Intrusion / Failed Login Attempt on ${systemId || 'NOUN-HRMS'}`,
+        severity: (heuristicCheck.detected ? heuristicCheck.severity : 'CRITICAL') as 'CRITICAL' | 'HIGH',
+        offending_ip: ipAddress,
+        geo_country: geo.country,
+        geo_region: geo.region,
+        geo_city: geo.city,
+        geo_lat: geo.latitude,
+        geo_lng: geo.longitude,
+        asn: geo.asn,
+        isp: geo.isp,
+        is_proxy_or_vpn: geo.isProxyOrVpn,
+        target_endpoint: target || '/api/auth/login',
+        http_method: 'POST',
+        captured_payload: details || `Unauthorized access attempt by "${email}" (${fullName}) from ${location}`,
+        status: 'UNRESOLVED' as const,
+        mitigation_blueprint: heuristicEngine.generateWafMitigation(ipAddress, target || '/api/auth/login', 'Intrusion'),
+        remediation_summary: `Active intrusion attempt detected on ${systemId || 'NOUN-HRMS'} from ${ipAddress} (${location}).`,
+        created_at_wat: getWATFormattedDate(),
+      };
+
+      await db.saveIncident(incident);
+      realtimeAlertHub.broadcastThreat(incident);
+      socEngine.createCaseFromIncident({
+        id: incident.id,
+        systemId: incident.system_id,
+        threatClassification: incident.threat_classification,
+        severity: incident.severity,
+        offendingIp: ipAddress,
+        targetEndpoint: incident.target_endpoint,
+        capturedPayload: incident.captured_payload,
+      });
+    }
 
     res.json({
       success: true,

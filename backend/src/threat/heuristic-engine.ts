@@ -38,6 +38,18 @@ export class HeuristicEngine {
     { regex: /%00/i, name: 'Null Byte File Extension Poisoning' },
   ];
 
+  // Regex rules for OS Command Injection & Remote Code Execution (RCE)
+  private commandInjectionPatterns = [
+    { regex: /(;|\||&&|\$\()\s*(cat|ls|whoami|id|uname|wget|curl|nc|netcat|bash|sh|python|perl|php)\b/i, name: 'OS Command Injection / Remote Shell Execution' },
+    { regex: /(\/bin\/bash|\/bin\/sh|cmd\.exe|powershell\.exe)/i, name: 'Direct Shell Binary Invocation Attempt' },
+    { regex: /\b(eval|exec|system|passthru|popen)\s*\(/i, name: 'Remote Code Execution (RCE) Function Probe' },
+  ];
+
+  // Regex rules for Automated Penetration Testing & Hacking Scanners
+  private scannerPatterns = [
+    { regex: /\b(sqlmap|nikto|nmap|masscan|dirbuster|gobuster|nuclei|hydra|medusa|burpsuite|metasploit|wpscan|acunetix|nessus)\b/i, name: 'Automated Vulnerability & Exploit Scanner' },
+  ];
+
   /**
    * Evaluates incoming request parameters, headers, URL, and body for attack vectors
    */
@@ -91,6 +103,36 @@ export class HeuristicEngine {
           matchedRule: rule.regex.toString(),
           mitigationBlueprint: this.generateWafMitigation(data.clientIp, data.path, 'Traversal'),
           remediationSummary: `Detected Path Traversal probe targeting ${data.path}. Enforce path normalization via path.resolve() and verify the target path strictly remains inside the designated whitelist directory root.`,
+        };
+      }
+    }
+
+    // 4. Check OS Command Injection & RCE
+    for (const rule of this.commandInjectionPatterns) {
+      if (rule.regex.test(combinedTarget)) {
+        return {
+          detected: true,
+          incidentType: 'COMMAND_INJECTION_RCE',
+          threatClassification: rule.name,
+          severity: 'CRITICAL',
+          matchedRule: rule.regex.toString(),
+          mitigationBlueprint: this.generateWafMitigation(data.clientIp, data.path, 'CommandInjection'),
+          remediationSummary: `Detected Remote Code Execution / Command Injection signature "${rule.name}" targeting ${data.path}. Immediately quarantine offending IP and forbid shell execution on user inputs.`,
+        };
+      }
+    }
+
+    // 5. Check Automated Hacking Scanners
+    for (const rule of this.scannerPatterns) {
+      if (rule.regex.test(combinedTarget)) {
+        return {
+          detected: true,
+          incidentType: 'RECON_SCANNER_INTRUSION',
+          threatClassification: rule.name,
+          severity: 'HIGH',
+          matchedRule: rule.regex.toString(),
+          mitigationBlueprint: this.generateWafMitigation(data.clientIp, data.path, 'Scanner'),
+          remediationSummary: `Detected automated reconnaissance/exploit scanner "${rule.name}" probing ${data.path}. Block offending IP at perimeter firewall.`,
         };
       }
     }

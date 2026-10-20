@@ -259,6 +259,13 @@ export const api = {
     return res.json();
   },
 
+  async traceIp(ip: string): Promise<any> {
+    const res = await fetch(`${API_BASE}/threats/trace/${encodeURIComponent(ip)}`, {
+      headers: getAuthHeaders(),
+    });
+    return res.json();
+  },
+
   async getQueryMetrics(systemId?: string, slowOnly: boolean = false): Promise<QueryMetricsResponse> {
     const params = new URLSearchParams();
     if (systemId) params.append('systemId', systemId);
@@ -286,10 +293,11 @@ export const api = {
     return res.json();
   },
 
-  getPdfReportUrl(systemId?: string): string {
+  getPdfReportUrl(systemId?: string, incidentId?: string): string {
     const token = authStorage.getToken();
     const params = new URLSearchParams();
     if (systemId) params.append('systemId', systemId);
+    if (incidentId) params.append('incidentId', incidentId);
     if (token) params.append('token', token);
     const qs = params.toString();
     return `${API_BASE}/reports/pdf${qs ? `?${qs}` : ''}`;
@@ -302,6 +310,15 @@ export const api = {
     if (token) params.append('token', token);
     const qs = params.toString();
     return `${API_BASE}/reports/csv${qs ? `?${qs}` : ''}`;
+  },
+
+  getAuditCsvReportUrl(systemId?: string): string {
+    const token = authStorage.getToken();
+    const params = new URLSearchParams();
+    if (systemId && systemId !== 'ALL') params.append('systemId', systemId);
+    if (token) params.append('token', token);
+    const qs = params.toString();
+    return `${API_BASE}/reports/audit-csv${qs ? `?${qs}` : ''}`;
   },
 
   // ─── STANDARD SOC OPERATIONS APIS ─────────────────────────

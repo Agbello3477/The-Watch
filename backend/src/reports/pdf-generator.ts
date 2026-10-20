@@ -5,6 +5,7 @@ import path from 'path';
 
 export interface ReportGenerationOptions {
   systemId?: string;
+  incidentId?: string;
   reportTitle?: string;
 }
 
@@ -13,9 +14,13 @@ export class ForensicPdfReportGenerator {
    * Generates an executive forensic security audit PDF with MaSha Tech Innovations branding
    */
   public async generatePdf(options: ReportGenerationOptions = {}): Promise<Buffer> {
-    const { systemId, reportTitle = 'INSTITUTIONAL CYBERSECURITY & OBSERVABILITY FORENSIC AUDIT' } = options;
+    const { systemId, incidentId, reportTitle = 'INSTITUTIONAL CYBERSECURITY & OBSERVABILITY FORENSIC AUDIT' } = options;
     const overview = await db.getSystemHealthOverview(systemId);
-    const incidents = await db.getIncidents({ systemId, limit: 100 });
+    const allIncidents = await db.getIncidents({ systemId, limit: 100 });
+    const incidents = incidentId
+      ? allIncidents.filter((inc) => inc.id === incidentId)
+      : allIncidents;
+    const auditLogs = await db.getUserAuditLogs(35, systemId);
     const probes = await db.getProbes(systemId);
 
     return new Promise((resolve, reject) => {
@@ -206,6 +211,39 @@ export class ForensicPdfReportGenerator {
 
       doc.y = codeBoxY + 110;
 
+      // ================= 4. USER ACTIVITY & SECURITY AUDIT TRAIL =================
+      if (!incidentId && auditLogs.length > 0) {
+        if (doc.y > 580) {
+          doc.addPage();
+          doc.y = 40;
+        } else {
+          doc.moveDown(1);
+        }
+
+        doc.fillColor('#0f172a').fontSize(12).font('Helvetica-Bold')
+          .text('4. REAL-TIME USER ACTIVITY & ACCESS AUDIT LOGS', 40, doc.y);
+
+        doc.moveDown(0.5);
+
+        const displayAudits = auditLogs.slice(0, 15);
+        for (const log of displayAudits) {
+          if (doc.y > 720) {
+            doc.addPage();
+            doc.y = 40;
+          }
+          const rowY = doc.y;
+          doc.roundedRect(40, rowY, 515.28, 34, 3).lineWidth(0.5).strokeColor('#cbd5e1').fillAndStroke('#f8fafc', '#cbd5e1');
+          const statusCol = log.status === 'SUCCESS' ? '#16a34a' : '#dc2626';
+          doc.fillColor(statusCol).fontSize(7.5).font('Helvetica-Bold')
+            .text(`[${log.action}] ${log.full_name || log.email} (${log.role || 'STAFF'})`, 48, rowY + 6);
+          doc.fillColor('#475569').fontSize(7.5).font('Helvetica')
+            .text(`WAT: ${log.created_at_wat} | System: ${log.system_id || 'NOUN-HRMS'}`, 310, rowY + 6, { align: 'right', width: 238 });
+          doc.fillColor('#334155').fontSize(7).font('Helvetica')
+            .text(`IP: ${log.ip_address} | Loc: ${log.location || 'Abuja, NG'} | ${log.details || ''}`, 48, rowY + 19, { width: 495, ellipsis: true });
+          doc.y = rowY + 38;
+        }
+      }
+
       // Footer
       const totalPages = doc.bufferedPageRange().count;
       for (let p = 0; p < totalPages; p++) {
@@ -273,6 +311,48 @@ export class ForensicCsvReportGenerator {
       escapeCsv(i.target_endpoint),
       escapeCsv(i.captured_payload),
       escapeCsv(i.remediation_summary || i.mitigation_blueprint),
+    ]);
+
+    return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  }
+
+  public async generateAuditCsv(systemId?: string): Promise<string> {
+    const logs = await db.getUserAuditLogs(500, systemId);
+
+    const headers = [
+      'AuditID',
+      'SystemID',
+      'TimestampWAT',
+      'Action',
+      'Status',
+      'FullName',
+      'Email',
+      'SystemRole',
+      'ClientIP',
+      'GeographicalLocation',
+      'ActionDetails',
+      'UserAgent',
+    ];
+
+    const escapeCsv = (val: any) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""').replace(/\n/g, ' ');
+      return `"${str}"`;
+    };
+
+    const rows = logs.map((l) => [
+      escapeCsv(l.id),
+      escapeCsv(l.system_id || 'NOUN-HRMS'),
+      escapeCsv(l.created_at_wat),
+      escapeCsv(l.action),
+      escapeCsv(l.status),
+      escapeCsv(l.full_name || l.email),
+      escapeCsv(l.email),
+      escapeCsv(l.role || 'STAFF'),
+      escapeCsv(l.ip_address),
+      escapeCsv(l.location || `${l.geo_city || 'Abuja'}, ${l.geo_country || 'Nigeria'}`),
+      escapeCsv(l.details),
+      escapeCsv(l.user_agent),
     ]);
 
     return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');

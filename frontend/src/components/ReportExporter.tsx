@@ -9,6 +9,7 @@ interface ReportExporterProps {
 export const ReportExporter: React.FC<ReportExporterProps> = ({ selectedSystem }) => {
   const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
   const [downloadingCsv, setDownloadingCsv] = useState<boolean>(false);
+  const [downloadingAuditCsv, setDownloadingAuditCsv] = useState<boolean>(false);
 
   const handleDownloadPdf = () => {
     setDownloadingPdf(true);
@@ -26,12 +27,24 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({ selectedSystem }
     setDownloadingCsv(true);
     api.trackUserAction({
       action: 'DOWNLOAD',
-      details: `Downloaded CSV Audit Logs (${selectedSystem || 'All Monitored Systems'})`,
+      details: `Downloaded CSV Threat Incident Logs (${selectedSystem || 'All Monitored Systems'})`,
       target: 'CSV Forensic Logs',
     });
     const url = api.getCsvReportUrl(selectedSystem || undefined);
     window.open(url, '_blank');
     setTimeout(() => setDownloadingCsv(false), 2000);
+  };
+
+  const handleDownloadAuditCsv = () => {
+    setDownloadingAuditCsv(true);
+    api.trackUserAction({
+      action: 'DOWNLOAD',
+      details: `Downloaded User Activity Audit Trail CSV (${selectedSystem || 'All Monitored Systems'})`,
+      target: 'User Audit Trail CSV',
+    });
+    const url = api.getAuditCsvReportUrl(selectedSystem || undefined);
+    window.open(url, '_blank');
+    setTimeout(() => setDownloadingAuditCsv(false), 2000);
   };
 
   return (
@@ -50,7 +63,7 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({ selectedSystem }
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         
         {/* PDF Export Card */}
         <div className="bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl p-5 flex flex-col justify-between transition">
@@ -143,7 +156,55 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({ selectedSystem }
               className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 px-4 py-2 rounded-lg font-bold text-xs transition cursor-pointer"
             >
               <Download className="w-4 h-4 text-emerald-400" />
-              {downloadingCsv ? 'Exporting CSV...' : 'Download Raw CSV'}
+              {downloadingCsv ? 'Exporting CSV...' : 'Download Threat CSV'}
+            </button>
+          </div>
+        </div>
+
+        {/* User Activity Audit Trail CSV Export Card */}
+        <div className="bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl p-5 flex flex-col justify-between transition">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-100">User Activity & Access Audit (CSV)</h3>
+                <span className="text-[11px] text-slate-400">Complete NOUN HRMS & SOC User Trail</span>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-1.5 text-xs text-slate-300">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Every Login, Logout, Click & File Download event</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Includes Full Staff Name, Email & System Role</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Client IP Address & Geo-Location (City, Country, ASN)</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Precise West Africa Time (WAT / UTC+1) timestamps</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between">
+            <span className="text-xs font-mono text-purple-400">
+              Format: Audit Trail CSV
+            </span>
+            <button
+              onClick={handleDownloadAuditCsv}
+              disabled={downloadingAuditCsv}
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-bold text-xs shadow-lg shadow-purple-600/20 transition cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              {downloadingAuditCsv ? 'Exporting Audit...' : 'Download Audit CSV'}
             </button>
           </div>
         </div>

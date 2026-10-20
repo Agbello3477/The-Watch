@@ -9,13 +9,19 @@ export interface RealtimeAlertPayload {
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   offendingIp: string;
   geoCountry?: string;
+  geoRegion?: string;
   geoCity?: string;
+  geoLat?: number;
+  geoLng?: number;
   asn?: string;
+  isp?: string;
+  isProxyOrVpn?: boolean;
   targetEndpoint: string;
   httpMethod: string;
   capturedPayload: string;
   status: 'UNRESOLVED' | 'ACKNOWLEDGED' | 'RESOLVED';
   mitigationBlueprint?: string;
+  remediationSummary?: string;
   timestampWat: string;
   timestampIso: string;
 }
@@ -57,14 +63,20 @@ export class RealtimeAlertHub {
       threatClassification: incident.threat_classification || incident.threatClassification || 'Malicious Attack Vector',
       severity: incident.severity || 'HIGH',
       offendingIp: incident.offending_ip || incident.offendingIp || '127.0.0.1',
-      geoCountry: incident.geo_country || incident.geoCountry,
-      geoCity: incident.geo_city || incident.geoCity,
-      asn: incident.asn,
+      geoCountry: incident.geo_country || incident.geoCountry || 'Nigeria',
+      geoRegion: incident.geo_region || incident.geoRegion || 'Abuja (FCT)',
+      geoCity: incident.geo_city || incident.geoCity || 'Abuja',
+      geoLat: incident.geo_lat ?? incident.geoLat ?? 9.0765,
+      geoLng: incident.geo_lng ?? incident.geoLng ?? 7.3986,
+      asn: incident.asn || 'AS37075',
+      isp: incident.isp || 'Unknown ISP',
+      isProxyOrVpn: Boolean(incident.is_proxy_or_vpn ?? incident.isProxyOrVpn),
       targetEndpoint: incident.target_endpoint || incident.targetEndpoint || '/',
       httpMethod: incident.http_method || incident.httpMethod || 'POST',
       capturedPayload: incident.captured_payload || incident.capturedPayload || '',
       status: incident.status || 'UNRESOLVED',
       mitigationBlueprint: incident.mitigation_blueprint || incident.mitigationBlueprint,
+      remediationSummary: incident.remediation_summary || incident.remediationSummary,
       timestampWat: incident.created_at_wat || getWATFormattedDate(),
       timestampIso: incident.created_at || new Date().toISOString(),
     };

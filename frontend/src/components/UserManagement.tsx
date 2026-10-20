@@ -402,7 +402,29 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
               </p>
             </div>
             
-            <div className="flex items-center space-x-2 shrink-0">
+            <div className="flex items-center flex-wrap gap-2 shrink-0">
+              <button
+                onClick={() => {
+                  const scope = auditSystemFilter === 'ALL' ? undefined : auditSystemFilter;
+                  window.open(api.getPdfReportUrl(scope), '_blank');
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-mono font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition cursor-pointer"
+                title="Download Full Security & Audit Report (PDF)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Report (PDF)</span>
+              </button>
+              <button
+                onClick={() => {
+                  const scope = auditSystemFilter === 'ALL' ? undefined : auditSystemFilter;
+                  window.open(api.getAuditCsvReportUrl(scope), '_blank');
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-mono font-bold bg-emerald-600 hover:bg-emerald-500 text-slate-950 shadow-md shadow-emerald-600/20 transition cursor-pointer"
+                title="Download User Activity Audit Trail (CSV)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Audit (CSV)</span>
+              </button>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border ${
                 liveStreamConnected 
                   ? 'bg-emerald-950/70 border-emerald-800 text-emerald-300' 
@@ -414,7 +436,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({ currentUser }) =
               <button
                 onClick={fetchData}
                 disabled={isLoading}
-                className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition"
+                className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition cursor-pointer"
                 title="Refresh audit trail"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />

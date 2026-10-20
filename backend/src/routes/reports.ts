@@ -60,17 +60,23 @@ async function logDownloadEvent(req: Request, fileType: 'PDF' | 'CSV', scope: st
 reportsRouter.get('/pdf', async (req: Request, res: Response) => {
   try {
     const systemId = req.query.systemId as string;
+    const incidentId = req.query.incidentId as string;
     const pdfBuffer = await pdfReportGenerator.generatePdf({
       systemId,
-      reportTitle: systemId
+      incidentId,
+      reportTitle: incidentId
+        ? `INTRUSION FORENSIC DOSSIER: ${incidentId.toUpperCase()}`
+        : systemId
         ? `FORENSIC SECURITY AUDIT: ${systemId.toUpperCase()}`
         : 'THE WATCH // INSTITUTIONAL SECURITY & OBSERVABILITY AUDIT',
     });
 
-    const filename = `TheWatch_Forensic_Audit_${systemId || 'AllSystems'}_${Date.now()}.pdf`;
+    const filename = incidentId
+      ? `TheWatch_Intrusion_Dossier_${incidentId}_${Date.now()}.pdf`
+      : `TheWatch_Forensic_Audit_${systemId || 'AllSystems'}_${Date.now()}.pdf`;
 
     // Asynchronously record download audit log
-    logDownloadEvent(req, 'PDF', systemId || 'All Systems');
+    logDownloadEvent(req, 'PDF', incidentId || systemId || 'All Systems');
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -89,7 +95,7 @@ reportsRouter.get('/csv', async (req: Request, res: Response) => {
   try {
     const systemId = req.query.systemId as string;
     const csvContent = await csvReportGenerator.generateCsv(systemId);
-    const filename = `TheWatch_Audit_Logs_${systemId || 'AllSystems'}_${Date.now()}.csv`;
+    const filename = `TheWatch_Threat_Incidents_${systemId || 'AllSystems'}_${Date.now()}.csv`;
 
     // Asynchronously record download audit log
     logDownloadEvent(req, 'CSV', systemId || 'All Systems');
@@ -100,5 +106,25 @@ reportsRouter.get('/csv', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[Reports] CSV generation error:', err);
     res.status(500).json({ error: 'FAILED_TO_GENERATE_CSV', message: err.message });
+  }
+});
+
+/**
+ * Downloads User Activity & Access Security Audit Trail CSV
+ */
+reportsRouter.get('/audit-csv', async (req: Request, res: Response) => {
+  try {
+    const systemId = req.query.systemId as string;
+    const csvContent = await csvReportGenerator.generateAuditCsv(systemId);
+    const filename = `TheWatch_User_Audit_Trail_${systemId || 'AllSystems'}_${Date.now()}.csv`;
+
+    logDownloadEvent(req, 'CSV', `User Audit Trail (${systemId || 'All Systems'})`);
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csvContent);
+  } catch (err: any) {
+    console.error('[Reports] Audit CSV generation error:', err);
+    res.status(500).json({ error: 'FAILED_TO_GENERATE_AUDIT_CSV', message: err.message });
   }
 });

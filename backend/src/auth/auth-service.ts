@@ -87,6 +87,33 @@ export class AuthService {
       await db.saveUserAuditLog(auditLog);
       realtimeAlertHub.broadcastAuditLog(auditLog);
 
+      // Broadcast real-time Intrusion Threat Alert for unauthorized login probe
+      const unknownUserIncident = {
+        id: `inc-intrusion-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        system_id: 'THE-WATCH-SOC',
+        incident_type: 'UNAUTHORIZED_INTRUSION_ATTEMPT',
+        threat_classification: `Unauthorized Account Probe (${cleanEmail})`,
+        severity: 'HIGH' as const,
+        offending_ip: ipAddress,
+        geo_country: geo.country,
+        geo_region: geo.region,
+        geo_city: geo.city,
+        geo_lat: geo.latitude,
+        geo_lng: geo.longitude,
+        asn: geo.asn,
+        isp: geo.isp,
+        is_proxy_or_vpn: geo.isProxyOrVpn,
+        target_endpoint: '/api/v1/auth/login',
+        http_method: 'POST',
+        captured_payload: `Attempted login with non-existent account "${cleanEmail}" | UA: ${userAgent || 'Unknown'}`,
+        status: 'UNRESOLVED' as const,
+        mitigation_blueprint: `iptables -I INPUT -s ${ipAddress} -j DROP`,
+        remediation_summary: `Unauthorized login attempt targeting unregistered account ${cleanEmail} from ${locationStr}.`,
+        created_at_wat: getWATFormattedDate(),
+      };
+      await db.saveIncident(unknownUserIncident);
+      realtimeAlertHub.broadcastThreat(unknownUserIncident);
+
       // Track 401 failure against DDoS & Credential stuffing detector
       await ddosDetector.trackAndInspect({
         clientIp: ipAddress,
@@ -196,6 +223,34 @@ export class AuthService {
       };
       await db.saveUserAuditLog(auditLog);
       realtimeAlertHub.broadcastAuditLog(auditLog);
+
+      const badPassIncident = {
+        id: `inc-bruteforce-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        system_id: 'THE-WATCH-SOC',
+        incident_type: lockUntil ? 'BRUTE_FORCE_LOCKOUT' : 'INTRUSION_ATTEMPT',
+        threat_classification: lockUntil
+          ? `Brute-Force Intrusion Lockout on ${user.email}`
+          : `Failed Authentication Intrusion Attempt (${newAttempts}/${this.MAX_FAILED_ATTEMPTS})`,
+        severity: (lockUntil || newAttempts >= 2 ? 'CRITICAL' : 'HIGH') as 'CRITICAL' | 'HIGH',
+        offending_ip: ipAddress,
+        geo_country: geo.country,
+        geo_region: geo.region,
+        geo_city: geo.city,
+        geo_lat: geo.latitude,
+        geo_lng: geo.longitude,
+        asn: geo.asn,
+        isp: geo.isp,
+        is_proxy_or_vpn: geo.isProxyOrVpn,
+        target_endpoint: '/api/v1/auth/login',
+        http_method: 'POST',
+        captured_payload: `Failed password attempt #${newAttempts} targeting "${user.email}" (${user.role}) | UA: ${userAgent || 'Unknown'}`,
+        status: 'UNRESOLVED' as const,
+        mitigation_blueprint: `iptables -I INPUT -s ${ipAddress} -j DROP`,
+        remediation_summary: `Failed credential verification (#${newAttempts}) targeting ${user.email} from ${locationStr}.`,
+        created_at_wat: getWATFormattedDate(),
+      };
+      await db.saveIncident(badPassIncident);
+      realtimeAlertHub.broadcastThreat(badPassIncident);
 
       // Track credential stuffing trigger
       await ddosDetector.trackAndInspect({
