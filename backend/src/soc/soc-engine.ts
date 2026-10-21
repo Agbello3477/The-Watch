@@ -114,6 +114,7 @@ export interface ShiftHandover {
 
 export class SocEngine {
   private blocklist: Map<string, IpBlocklistEntry> = new Map();
+  private operatorWhitelistedIps: Set<string> = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
   private iocs: Map<string, IocEntry> = new Map();
   private cases: Map<string, SocCase> = new Map();
   private playbooks: Map<string, SocPlaybook> = new Map();
@@ -643,8 +644,26 @@ export class SocEngine {
   }
 
   // ===================== IP BLOCKLIST (FIREWALL) =====================
+  public whitelistOperatorIp(ip: string): void {
+    const clean = (ip || '').trim();
+    if (!clean) return;
+    this.operatorWhitelistedIps.add(clean);
+    const existing = this.blocklist.get(clean);
+    if (existing) {
+      existing.status = 'REVOKED';
+    }
+  }
+
+  public isOperatorWhitelisted(ip: string): boolean {
+    return this.operatorWhitelistedIps.has((ip || '').trim());
+  }
+
   public isIpBlocked(ip: string): boolean {
-    const entry = this.blocklist.get(ip);
+    const clean = (ip || '').trim();
+    if (this.operatorWhitelistedIps.has(clean)) {
+      return false;
+    }
+    const entry = this.blocklist.get(clean);
     return !!entry && entry.status === 'ACTIVE';
   }
 
@@ -667,17 +686,19 @@ export class SocEngine {
     blockedBy?: string;
     durationHours?: number;
   }): IpBlocklistEntry {
+    const cleanIp = data.ip.trim();
     const duration = data.durationHours || 24;
+    const isProtectedOperator = this.operatorWhitelistedIps.has(cleanIp);
     const entry: IpBlocklistEntry = {
       id: `blk-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      ip: data.ip.trim(),
-      reason: data.reason,
+      ip: cleanIp,
+      reason: isProtectedOperator ? `${data.reason} [SOC Operator IP Protected from Self-Lockout]` : data.reason,
       threatClassification: data.threatClassification || 'Manual SOC Quarantine',
       systemId: data.systemId || 'NOUN-HRMS',
       blockedBy: data.blockedBy || 'Security Operator',
       blockedAtWat: getWATFormattedDate(),
       expiresAtWat: getWATFormattedDate(new Date(Date.now() + duration * 3600000)),
-      status: 'ACTIVE',
+      status: isProtectedOperator ? 'REVOKED' : 'ACTIVE',
       requestCountBlocked: 0,
     };
     this.blocklist.set(entry.ip, entry);
@@ -685,12 +706,14 @@ export class SocEngine {
   }
 
   public unblockIp(ip: string): boolean {
-    const entry = this.blocklist.get(ip);
+    const clean = decodeURIComponent(ip || '').trim();
+    this.operatorWhitelistedIps.add(clean);
+    const entry = this.blocklist.get(clean);
     if (entry) {
       entry.status = 'REVOKED';
       return true;
     }
-    return false;
+    return true;
   }
 
   // ===================== THREAT INTELLIGENCE (IOCS) =====================

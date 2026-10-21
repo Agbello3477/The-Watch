@@ -4,6 +4,7 @@ import { authenticateUser, AuthenticatedUserRequest } from '../middleware/user-a
 import { db, UserAuditLog, getWATFormattedDate } from '../db/database';
 import { geoIPService } from '../threat/geoip-service';
 import { realtimeAlertHub } from '../alerts/realtime-alert-hub';
+import { socEngine } from '../soc/soc-engine';
 
 export const authRouter = Router();
 
@@ -37,6 +38,9 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     return;
   }
 
+  // Whitelist & unban authenticated SOC Operator IP so resolving self-tested alerts never locks out the operator
+  socEngine.whitelistOperatorIp(ipAddress);
+
   res.json(result);
 });
 
@@ -44,6 +48,8 @@ authRouter.post('/login', async (req: Request, res: Response) => {
  * Get current session profile
  */
 authRouter.get('/me', authenticateUser, (req: AuthenticatedUserRequest, res: Response) => {
+  const ipAddress = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '127.0.0.1').split(',')[0].trim();
+  socEngine.whitelistOperatorIp(ipAddress);
   res.json({
     user: req.user,
     sessionValid: true,

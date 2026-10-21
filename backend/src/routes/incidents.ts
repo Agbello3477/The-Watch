@@ -39,10 +39,14 @@ const updateIncidentStatusHandler = async (req: Request, res: Response) => {
   }
 
   const containmentActions: string[] = [];
+  const operatorIp = ((req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1')
+    .split(',')[0]
+    .trim();
+  socEngine.whitelistOperatorIp(operatorIp);
 
   // ACTIVE THREAT NEUTRALIZATION PIPELINE
   if (status === 'RESOLVED') {
-    // 1. Quarantines offending origin IP in active Ingest Edge Firewall (drop 403)
+    // 1. Quarantines offending origin IP in active Ingest Edge Firewall (drop 403), protecting operator's own IP from self-lockout
     if (updated.offending_ip && updated.offending_ip !== '127.0.0.1') {
       socEngine.blockIp({
         ip: updated.offending_ip,

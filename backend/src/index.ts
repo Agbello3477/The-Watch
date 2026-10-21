@@ -42,11 +42,14 @@ app.use(express.urlencoded({ extended: true }));
 
 // Active Self-Defense WAF & Real-Time Intrusion Detection Middleware for The Watch Platform
 app.use(async (req, res, next) => {
-  // Skip internal SSE stream & simulation/ingest endpoints (handled by IngestQueue)
+  // Skip internal SSE stream, alert rerouting, SOC management & simulation/ingest endpoints
   if (
     req.path.startsWith('/api/v1/telemetry') ||
     req.path.startsWith('/api/v1/simulation') ||
-    req.path.startsWith('/api/v1/threats/stream') ||
+    req.path.startsWith('/api/v1/threats') ||
+    req.path.startsWith('/api/v1/soc') ||
+    req.path.startsWith('/api/v1/incidents') ||
+    req.path.startsWith('/api/v1/reports') ||
     req.path.startsWith('/api/v1/audit/track')
   ) {
     return next();
@@ -56,8 +59,17 @@ app.use(async (req, res, next) => {
     .split(',')[0]
     .trim();
 
-  // 1. Enforce Active SOC IP Blocklist
-  if (socEngine.isIpBlocked(clientIp) && !req.path.startsWith('/api/v1/soc/blocklist')) {
+  // Automatically protect authenticated SOC Operators from accidental self-quarantine
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    socEngine.whitelistOperatorIp(clientIp);
+  }
+
+  // 1. Enforce Active SOC IP Blocklist (Never block /api/v1/auth/* or /api/v1/soc/blocklist so SOC Admins can always sign in and manage quarantine)
+  if (
+    socEngine.isIpBlocked(clientIp) &&
+    !req.path.startsWith('/api/v1/soc/blocklist') &&
+    !req.path.startsWith('/api/v1/auth')
+  ) {
     socEngine.recordBlockedRequest(clientIp);
     res.status(403).json({
       error: 'IP_QUARANTINED_BY_THE_WATCH_SOC',

@@ -85,6 +85,11 @@ socRouter.post('/blocklist', (req: Request, res: Response) => {
     res.status(400).json({ error: 'IP and reason are required' });
     return;
   }
+  const operatorIp = ((req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1')
+    .split(',')[0]
+    .trim();
+  socEngine.whitelistOperatorIp(operatorIp);
+
   const entry = socEngine.blockIp({
     ip,
     reason,
@@ -97,12 +102,17 @@ socRouter.post('/blocklist', (req: Request, res: Response) => {
 });
 
 socRouter.delete('/blocklist/:ip', (req: Request, res: Response) => {
-  const success = socEngine.unblockIp(req.params.ip);
+  const operatorIp = ((req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1')
+    .split(',')[0]
+    .trim();
+  socEngine.whitelistOperatorIp(operatorIp);
+  const targetIp = req.params.ip === 'SELF' ? operatorIp : req.params.ip;
+  const success = socEngine.unblockIp(targetIp);
   if (!success) {
     res.status(404).json({ error: 'IP not found in blocklist' });
     return;
   }
-  res.json({ status: 'UNBLOCKED', ip: req.params.ip });
+  res.json({ status: 'UNBLOCKED', ip: targetIp });
 });
 
 // ─── 4. Threat Intelligence (IOCs) ────────────────────────────
