@@ -75,7 +75,16 @@ export class IngestQueue {
       errorMessage,
     } = item;
 
-    // 0. Active SOC Firewall check: Drop immediately if IP is blacklisted
+    // 0. Pre-evaluate heuristic threat signature so packet capture logs exact verdict
+    const preThreatMatch = heuristicEngine.evaluate({
+      method,
+      path,
+      payload: payloadSnippet,
+      userAgent,
+      clientIp,
+    });
+
+    // Active SOC Firewall check: Drop immediately if IP is blacklisted
     if (socEngine.isIpBlocked(clientIp)) {
       socEngine.recordBlockedRequest(clientIp);
       await db.saveTelemetryLog({
@@ -88,21 +97,49 @@ export class IngestQueue {
         client_ip: clientIp,
         payload_snippet: `[BLOCKED_BY_SOC_FIREWALL] Dropped request from quarantined IP`,
         user_agent: userAgent,
+        headers_json: JSON.stringify({
+          verdict: 'MALICIOUS_BLOCKED',
+          threatClassification: 'Quarantined IP Firewall Drop',
+          direction: 'INBOUND_REQ',
+          protocol: 'HTTPS/TLSv1.3',
+          sourcePort: 49152 + Math.floor(Math.random() * 15000),
+          destIp: `10.20.1.55 (${systemId})`,
+          destPort: 443,
+          lengthBytes: 420 + (payloadSnippet ? payloadSnippet.length : 0),
+        }),
       });
       return;
     }
 
-    // 1. Save standard telemetry log
+    const packetVerdict = preThreatMatch.detected
+      ? 'MALICIOUS_BLOCKED'
+      : (statusCode || 200) >= 400
+      ? 'UNSUCCESSFUL'
+      : 'ALLOWED_HEALTHY';
+
+    // 1. Save standard telemetry log with Wireshark packet dissection metadata
     await db.saveTelemetryLog({
       id: `tel-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
       system_id: systemId,
       method: method || 'GET',
       path: path || '/',
-      status_code: statusCode || 200,
+      status_code: preThreatMatch.detected ? 403 : statusCode || 200,
       latency_ms: latencyMs || 10,
       client_ip: clientIp || '127.0.0.1',
-      payload_snippet: payloadSnippet,
+      payload_snippet: preThreatMatch.detected
+        ? `[MALICIOUS_SIGNATURE: ${preThreatMatch.threatClassification}] ${payloadSnippet || path}`
+        : payloadSnippet,
       user_agent: userAgent,
+      headers_json: JSON.stringify({
+        verdict: packetVerdict,
+        threatClassification: preThreatMatch.detected ? preThreatMatch.threatClassification : undefined,
+        direction: packetVerdict === 'MALICIOUS_BLOCKED' ? 'INBOUND_REQ' : 'INBOUND_AND_OUTBOUND',
+        protocol: 'HTTPS/TLSv1.3',
+        sourcePort: 49152 + Math.floor(Math.random() * 15000),
+        destIp: `10.20.1.55 (${systemId})`,
+        destPort: 443,
+        lengthBytes: 580 + (payloadSnippet ? payloadSnippet.length : 0) + ((statusCode || 200) < 400 ? 1240 : 220),
+      }),
     });
 
     // 2. Track DB query metrics if reported

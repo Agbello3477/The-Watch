@@ -9,6 +9,7 @@ import { RemediationAdvisor } from './components/RemediationAdvisor';
 import { ReportExporter } from './components/ReportExporter';
 import { AttackSimulator } from './components/AttackSimulator';
 import { TrafficMonitor } from './components/TrafficMonitor';
+import { SurfaceScanner } from './components/SurfaceScanner';
 import { LandingHome } from './components/LandingHome';
 import { LoginModal } from './components/LoginModal';
 import { UserManagement } from './components/UserManagement';
@@ -25,12 +26,12 @@ import {
   AdvisorResponse,
   AuthSessionUser,
 } from './types/dashboard';
-import { Globe, Activity, Sparkles, FileText, Flame, Users, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Globe, Activity, Sparkles, FileText, Flame, Users, ShieldCheck, ShieldAlert, Radar } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [selectedSystem, setSelectedSystem] = useState<string>('');
   const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'users'>('home');
-  const [activeSocTab, setActiveSocTab] = useState<'soc' | 'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'traffic' | 'connect'>('soc');
+  const [activeSocTab, setActiveSocTab] = useState<'soc' | 'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'traffic' | 'scanner' | 'connect'>('soc');
   
   // Auth state
   const [currentUser, setCurrentUser] = useState<AuthSessionUser | null>(authStorage.getUser());
@@ -445,7 +446,19 @@ export const App: React.FC = () => {
                   }`}
                 >
                   <Activity className="w-3.5 h-3.5" />
-                  <span>HRMS Traffic</span>
+                  <span>Wireshark Traffic</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveSocTab('scanner')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                    activeSocTab === 'scanner'
+                      ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-400/20'
+                      : 'text-cyan-300 hover:text-cyan-200'
+                  }`}
+                >
+                  <Radar className="w-3.5 h-3.5" />
+                  <span>Port &amp; Vuln Scanner</span>
                 </button>
 
                 <button
@@ -517,7 +530,13 @@ export const App: React.FC = () => {
 
             {activeSocTab === 'traffic' && (
               <div className="space-y-6">
-                <TrafficMonitor selectedSystem={selectedSystem || 'NOUN-HRMS'} />
+                <TrafficMonitor selectedSystem={selectedSystem || 'ALL'} />
+              </div>
+            )}
+
+            {activeSocTab === 'scanner' && (
+              <div className="space-y-6">
+                <SurfaceScanner />
               </div>
             )}
 

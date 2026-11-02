@@ -22,6 +22,7 @@ import { tenantsRouter } from './routes/tenants';
 import { trafficRouter } from './routes/traffic.js';
 import { socRouter } from './routes/soc';
 import { auditRouter } from './routes/audit';
+import { scannerRouter } from './routes/scanner';
 import { ingestQueue } from './ingest/ingest-queue';
 import { heuristicEngine } from './threat/heuristic-engine';
 import { geoIPService } from './threat/geoip-service';
@@ -42,7 +43,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Active Self-Defense WAF & Real-Time Intrusion Detection Middleware for The Watch Platform
 app.use(async (req, res, next) => {
-  // Skip internal SSE stream, alert rerouting, SOC management & simulation/ingest endpoints
+  // Skip internal SSE stream, alert rerouting, SOC management, surface scanner & simulation/ingest endpoints
   if (
     req.path.startsWith('/api/v1/telemetry') ||
     req.path.startsWith('/api/v1/simulation') ||
@@ -50,6 +51,7 @@ app.use(async (req, res, next) => {
     req.path.startsWith('/api/v1/soc') ||
     req.path.startsWith('/api/v1/incidents') ||
     req.path.startsWith('/api/v1/reports') ||
+    req.path.startsWith('/api/v1/scanner') ||
     req.path.startsWith('/api/v1/audit/track')
   ) {
     return next();
@@ -71,6 +73,27 @@ app.use(async (req, res, next) => {
     !req.path.startsWith('/api/v1/auth')
   ) {
     socEngine.recordBlockedRequest(clientIp);
+    db.saveTelemetryLog({
+      id: `tel-watch-blk-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      system_id: 'THE-WATCH-SOC',
+      method: req.method,
+      path: req.originalUrl || req.path,
+      status_code: 403,
+      latency_ms: 1,
+      client_ip: clientIp,
+      payload_snippet: `[BLOCKED_BY_SOC_FIREWALL] Quarantined IP (${clientIp}) dropped at Edge Firewall`,
+      user_agent: req.headers['user-agent'],
+      headers_json: JSON.stringify({
+        verdict: 'MALICIOUS_BLOCKED',
+        threatClassification: 'Quarantined IP Firewall Drop',
+        direction: 'INBOUND_REQ',
+        protocol: 'HTTPS/TLSv1.3',
+        sourcePort: 50000 + Math.floor(Math.random() * 14000),
+        destIp: '10.20.0.10 (THE-WATCH-SOC)',
+        destPort: 443,
+        lengthBytes: 420,
+      }),
+    }).catch(() => {});
     res.status(403).json({
       error: 'IP_QUARANTINED_BY_THE_WATCH_SOC',
       message: `Access Denied: Your IP address (${clientIp}) has been blocked by The Watch Active Intrusion Firewall.`,
@@ -91,6 +114,7 @@ app.use(async (req, res, next) => {
   });
 
   if (match.detected) {
+    (req as any).__watchThreatMatch = match;
     try {
       const geo = await geoIPService.resolve(clientIp);
       const incident = {
@@ -135,18 +159,68 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// Request logging in development
+// Live Wireshark-Style Packet Capture for The Watch (THE-WATCH-SOC)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/v1/telemetry/ingest')) {
-    // skip high-frequency ingest logs
+  // Skip high-frequency telemetry ingest & background traffic polling so capture feed stays clean
+  if (
+    req.path.startsWith('/api/v1/telemetry/ingest') ||
+    req.path.startsWith('/api/v1/traffic/') ||
+    req.path.startsWith('/api/v1/threats/stream')
+  ) {
     return next();
   }
   const start = Date.now();
+  const clientIp = ((req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1')
+    .split(',')[0]
+    .trim();
+
   res.on('finish', () => {
     const duration = Date.now() - start;
     if (duration > 100 || res.statusCode >= 400) {
       console.log(`[HTTP] ${req.method} ${req.path} -> ${res.statusCode} (${duration}ms)`);
     }
+
+    const threatMatch = (req as any).__watchThreatMatch;
+    const isMalicious = Boolean(threatMatch?.detected);
+    const verdict = isMalicious
+      ? 'MALICIOUS_BLOCKED'
+      : res.statusCode >= 400
+      ? 'UNSUCCESSFUL'
+      : 'ALLOWED_HEALTHY';
+
+    let safeSnippet = '';
+    try {
+      if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+        const redacted = { ...req.body };
+        if (redacted.password) redacted.password = '[REDACTED]';
+        if (redacted.token) redacted.token = '[REDACTED]';
+        safeSnippet = JSON.stringify(redacted).slice(0, 260);
+      }
+    } catch {}
+
+    db.saveTelemetryLog({
+      id: `tel-watch-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      system_id: 'THE-WATCH-SOC',
+      method: req.method,
+      path: req.originalUrl || req.path,
+      status_code: isMalicious ? 403 : res.statusCode,
+      latency_ms: duration,
+      client_ip: clientIp,
+      payload_snippet: isMalicious
+        ? `[MALICIOUS_SIGNATURE: ${threatMatch.threatClassification}] ${safeSnippet || req.originalUrl}`
+        : safeSnippet || `HTTP ${res.statusCode} response from THE-WATCH-SOC`,
+      user_agent: req.headers['user-agent'],
+      headers_json: JSON.stringify({
+        verdict,
+        threatClassification: isMalicious ? threatMatch.threatClassification : undefined,
+        direction: isMalicious ? 'INBOUND_REQ' : res.statusCode >= 400 ? 'OUTBOUND_RES' : 'INBOUND_AND_OUTBOUND',
+        protocol: 'HTTPS/TLSv1.3',
+        sourcePort: 49152 + Math.floor(Math.random() * 15000),
+        destIp: '10.20.0.10 (THE-WATCH-SOC)',
+        destPort: 443,
+        lengthBytes: 520 + safeSnippet.length + (res.statusCode < 400 ? 980 : 210),
+      }),
+    }).catch(() => {});
   });
   next();
 });
@@ -188,6 +262,7 @@ app.use('/api/v1/simulation', simulationRouter);
 app.use('/api/v1/traffic', trafficRouter);
 app.use('/api/v1/soc', socRouter);
 app.use('/api/v1/audit', auditRouter);
+app.use('/api/v1/scanner', scannerRouter);
 
 // Root health check
 app.get('/health', (req, res) => {

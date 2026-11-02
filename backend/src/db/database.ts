@@ -368,6 +368,163 @@ class DatabaseManager {
       created_at_wat: getWATFormattedDate(),
       created_at: new Date().toISOString(),
     });
+
+    // 6. Seed initial Wireshark-style packet capture frames for NOUN-HRMS and THE-WATCH-SOC (Green, Amber Yellow, Red)
+    const initialPackets: TelemetryLog[] = [
+      {
+        id: 'pkt-seed-001',
+        system_id: 'NOUN-HRMS',
+        method: 'GET',
+        path: '/api/v1/staff/directory?page=1&limit=50',
+        status_code: 200,
+        latency_ms: 42,
+        client_ip: '102.89.23.45',
+        payload_snippet: 'Query: page=1, limit=50 | Response: 200 OK (50 staff records returned)',
+        user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/129.0.0.0',
+        headers_json: JSON.stringify({
+          verdict: 'ALLOWED_HEALTHY',
+          direction: 'INBOUND_AND_OUTBOUND',
+          protocol: 'HTTPS/TLSv1.3',
+          sourcePort: 54210,
+          destIp: '10.20.1.55 (NOUN-HRMS)',
+          destPort: 443,
+          lengthBytes: 4820,
+        }),
+        created_at: new Date(Date.now() - 45000).toISOString(),
+      },
+      {
+        id: 'pkt-seed-002',
+        system_id: 'THE-WATCH-SOC',
+        method: 'POST',
+        path: '/api/v1/auth/login',
+        status_code: 200,
+        latency_ms: 68,
+        client_ip: '154.68.225.146',
+        payload_snippet: '{"email":"abdulgaffarbello3477@gmail.com","status":"AUTHENTICATED_SUPER_ADMIN"}',
+        user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        headers_json: JSON.stringify({
+          verdict: 'ALLOWED_HEALTHY',
+          direction: 'INBOUND_AND_OUTBOUND',
+          protocol: 'HTTPS/TLSv1.3',
+          sourcePort: 58914,
+          destIp: '10.20.0.10 (THE-WATCH-SOC)',
+          destPort: 443,
+          lengthBytes: 1290,
+        }),
+        created_at: new Date(Date.now() - 38000).toISOString(),
+      },
+      {
+        id: 'pkt-seed-003',
+        system_id: 'NOUN-HRMS',
+        method: 'POST',
+        path: '/api/v1/payroll/export',
+        status_code: 403,
+        latency_ms: 4,
+        client_ip: '194.26.29.112',
+        payload_snippet: "dept_id=1' UNION SELECT staff_id, full_name, bvn, salary FROM staff_payroll WHERE '1'='1' -- [BLOCKED_BY_SOC_FIREWALL]",
+        user_agent: 'sqlmap/1.7.2#stable (https://sqlmap.org)',
+        headers_json: JSON.stringify({
+          verdict: 'MALICIOUS_BLOCKED',
+          threatClassification: 'SQLi UNION-Based Data Extraction',
+          direction: 'INBOUND_REQ',
+          protocol: 'HTTPS/TLSv1.3',
+          sourcePort: 49822,
+          destIp: '10.20.1.55 (NOUN-HRMS)',
+          destPort: 443,
+          lengthBytes: 948,
+        }),
+        created_at: new Date(Date.now() - 31000).toISOString(),
+      },
+      {
+        id: 'pkt-seed-004',
+        system_id: 'NOUN-HRMS',
+        method: 'POST',
+        path: '/api/v1/auth/session',
+        status_code: 401,
+        latency_ms: 89,
+        client_ip: '105.112.44.19',
+        payload_snippet: '{"email":"staff.registry@noun.edu.ng","error":"INVALID_PASSWORD_ATTEMPT"}',
+        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0.0.0',
+        headers_json: JSON.stringify({
+          verdict: 'UNSUCCESSFUL',
+          direction: 'OUTBOUND_RES',
+          protocol: 'HTTPS/TLSv1.3',
+          sourcePort: 51204,
+          destIp: '10.20.1.55 (NOUN-HRMS)',
+          destPort: 443,
+          lengthBytes: 612,
+        }),
+        created_at: new Date(Date.now() - 25000).toISOString(),
+      },
+      {
+        id: 'pkt-seed-005',
+        system_id: 'THE-WATCH-SOC',
+        method: 'GET',
+        path: '/api/v1/admin/config/../../etc/passwd',
+        status_code: 403,
+        latency_ms: 2,
+        client_ip: '45.154.255.89',
+        payload_snippet: '[BLOCKED_BY_SOC_FIREWALL] Directory Traversal & Sensitive File Exposure Attempt Dropped',
+        user_agent: 'curl/8.4.0',
+        headers_json: JSON.stringify({
+          verdict: 'MALICIOUS_BLOCKED',
+          threatClassification: 'Directory Traversal & Sensitive File Exposure',
+          direction: 'INBOUND_REQ',
+          protocol: 'HTTP/1.1',
+          sourcePort: 60112,
+          destIp: '10.20.0.10 (THE-WATCH-SOC)',
+          destPort: 443,
+          lengthBytes: 514,
+        }),
+        created_at: new Date(Date.now() - 19000).toISOString(),
+      },
+      {
+        id: 'pkt-seed-006',
+        system_id: 'NOUN-HRMS',
+        method: 'GET',
+        path: '/api/v1/registry/file-requests/missing-dossier-992',
+        status_code: 404,
+        latency_ms: 31,
+        client_ip: '102.89.34.12',
+        payload_snippet: '{"error":"RESOURCE_NOT_FOUND","message":"Requested personnel dossier ID 992 does not exist"}',
+        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edge/128.0.0.0',
+        headers_json: JSON.stringify({
+          verdict: 'UNSUCCESSFUL',
+          direction: 'OUTBOUND_RES',
+          protocol: 'HTTPS/TLSv1.3',
+          sourcePort: 55390,
+          destIp: '10.20.1.55 (NOUN-HRMS)',
+          destPort: 443,
+          lengthBytes: 540,
+        }),
+        created_at: new Date(Date.now() - 12000).toISOString(),
+      },
+      {
+        id: 'pkt-seed-007',
+        system_id: 'THE-WATCH-SOC',
+        method: 'GET',
+        path: '/api/v1/soc/metrics',
+        status_code: 200,
+        latency_ms: 19,
+        client_ip: '154.68.225.146',
+        payload_snippet: '{"mttdSec":14,"mttrMin":18,"slaCompliancePercent":100,"status":"HEALTHY_STREAM"}',
+        user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/129.0.0.0',
+        headers_json: JSON.stringify({
+          verdict: 'ALLOWED_HEALTHY',
+          direction: 'INBOUND_AND_OUTBOUND',
+          protocol: 'HTTPS/TLSv1.3',
+          sourcePort: 58920,
+          destIp: '10.20.0.10 (THE-WATCH-SOC)',
+          destPort: 443,
+          lengthBytes: 1840,
+        }),
+        created_at: new Date(Date.now() - 6000).toISOString(),
+      },
+    ];
+
+    for (const pkt of initialPackets) {
+      this.memoryStore.telemetryLogs.push(pkt);
+    }
   }
 
   // ===================== USER MANAGEMENT =====================
@@ -749,18 +906,43 @@ class DatabaseManager {
     return logs.slice(0, limit);
   }
 
-  public async getRecentTelemetryLogs(systemId: string, limit: number = 100): Promise<TelemetryLog[]> {
+  public async getRecentTelemetryLogs(systemId: string = 'ALL', limit: number = 150): Promise<TelemetryLog[]> {
+    const isAll = !systemId || systemId === 'ALL' || systemId === 'ALL_SYSTEMS';
+    const mergedMap = new Map<string, TelemetryLog>();
+
     if (this.isPostgresConnected && this.pgPool) {
       try {
-        const result = await this.pgPool.query(
-          `SELECT * FROM telemetry_logs WHERE system_id = $1 ORDER BY created_at DESC LIMIT $2`,
-          [systemId, limit]
-        );
-        return result.rows;
+        const result = isAll
+          ? await this.pgPool.query(
+              `SELECT * FROM telemetry_logs ORDER BY created_at DESC LIMIT $1`,
+              [limit]
+            )
+          : await this.pgPool.query(
+              `SELECT * FROM telemetry_logs WHERE system_id = $1 ORDER BY created_at DESC LIMIT $2`,
+              [systemId, limit]
+            );
+        for (const row of result.rows) {
+          mergedMap.set(row.id, row);
+        }
       } catch (e) {}
     }
-    return this.memoryStore.telemetryLogs
-      .filter(l => l.system_id === systemId)
+
+    const memLogs = isAll
+      ? this.memoryStore.telemetryLogs
+      : this.memoryStore.telemetryLogs.filter((l) => l.system_id === systemId);
+
+    for (const item of memLogs) {
+      if (!mergedMap.has(item.id)) {
+        mergedMap.set(item.id, item);
+      }
+    }
+
+    return Array.from(mergedMap.values())
+      .sort((a, b) => {
+        const tA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return tB - tA;
+      })
       .slice(0, limit);
   }
 
