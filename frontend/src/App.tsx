@@ -10,6 +10,7 @@ import { ReportExporter } from './components/ReportExporter';
 import { AttackSimulator } from './components/AttackSimulator';
 import { TrafficMonitor } from './components/TrafficMonitor';
 import { SurfaceScanner } from './components/SurfaceScanner';
+import { ZeekNetworkMonitor } from './components/ZeekNetworkMonitor';
 import { LandingHome } from './components/LandingHome';
 import { LoginModal } from './components/LoginModal';
 import { UserManagement } from './components/UserManagement';
@@ -26,12 +27,12 @@ import {
   AdvisorResponse,
   AuthSessionUser,
 } from './types/dashboard';
-import { Globe, Activity, Sparkles, FileText, Flame, Users, ShieldCheck, ShieldAlert, Radar } from 'lucide-react';
+import { Globe, Activity, Sparkles, FileText, Flame, Users, ShieldCheck, ShieldAlert, Radar, Network } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [selectedSystem, setSelectedSystem] = useState<string>('');
   const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'users'>('home');
-  const [activeSocTab, setActiveSocTab] = useState<'soc' | 'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'traffic' | 'scanner' | 'connect'>('soc');
+  const [activeSocTab, setActiveSocTab] = useState<'soc' | 'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'traffic' | 'scanner' | 'zeek' | 'connect'>('soc');
   
   // Auth state
   const [currentUser, setCurrentUser] = useState<AuthSessionUser | null>(authStorage.getUser());
@@ -462,6 +463,18 @@ export const App: React.FC = () => {
                 </button>
 
                 <button
+                  onClick={() => setActiveSocTab('zeek')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                    activeSocTab === 'zeek'
+                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                      : 'text-indigo-300 hover:text-indigo-200'
+                  }`}
+                >
+                  <Network className="w-3.5 h-3.5" />
+                  <span>Zeek NSM</span>
+                </button>
+
+                <button
                   onClick={() => setActiveSocTab('connect')}
                   className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                     activeSocTab === 'connect'
@@ -537,6 +550,12 @@ export const App: React.FC = () => {
             {activeSocTab === 'scanner' && (
               <div className="space-y-6">
                 <SurfaceScanner />
+              </div>
+            )}
+
+            {activeSocTab === 'zeek' && (
+              <div className="space-y-6">
+                <ZeekNetworkMonitor />
               </div>
             )}
 

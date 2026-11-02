@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # 1. Zeek Network Security Monitor (Passive SPAN/TAP Interface Sensor)
+  zeek-sensor:
+    image: zeek/zeek:6.0
+    container_name: the-watch-zeek-sensor
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./zeek/local.zeek:/usr/local/zeek/share/zeek/site/local.zeek:ro
+      - zeek-logs:/usr/local/zeek/logs/current
+    command: >
+      zeek -C -i ${ZEEK_INTERFACE:-eth0} local
+    restart: unless-stopped
+
+  # 2. Fluent Bit Log Shipper (Streams conn.log, dns.log, ssl.log, http.log, files.log, notice.log -> The Watch)
+  zeek-log-shipper:
+    image: cr.fluentbit.io/fluent/fluent-bit:3.0
+    container_name: the-watch-zeek-shipper
+    depends_on:
+      - zeek-sensor
+    volumes:
+      - zeek-logs:/usr/local/zeek/logs/current:ro
+      - ./zeek/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./zeek/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+    restart: unless-stopped
+
+volumes:
+  zeek-logs:

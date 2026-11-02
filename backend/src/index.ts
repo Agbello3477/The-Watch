@@ -23,6 +23,7 @@ import { trafficRouter } from './routes/traffic.js';
 import { socRouter } from './routes/soc';
 import { auditRouter } from './routes/audit';
 import { scannerRouter } from './routes/scanner';
+import { zeekRouter } from './routes/zeek';
 import { ingestQueue } from './ingest/ingest-queue';
 import { heuristicEngine } from './threat/heuristic-engine';
 import { geoIPService } from './threat/geoip-service';
@@ -52,6 +53,8 @@ app.use(async (req, res, next) => {
     req.path.startsWith('/api/v1/incidents') ||
     req.path.startsWith('/api/v1/reports') ||
     req.path.startsWith('/api/v1/scanner') ||
+    req.path.startsWith('/api/v1/zeek') ||
+    req.path.startsWith('/api/soc/zeek') ||
     req.path.startsWith('/api/v1/audit/track')
   ) {
     return next();
@@ -165,6 +168,8 @@ app.use((req, res, next) => {
   if (
     req.path.startsWith('/api/v1/telemetry/ingest') ||
     req.path.startsWith('/api/v1/traffic/') ||
+    req.path.startsWith('/api/v1/zeek/') ||
+    req.path.startsWith('/api/soc/zeek/') ||
     req.path.startsWith('/api/v1/threats/stream')
   ) {
     return next();
@@ -263,6 +268,8 @@ app.use('/api/v1/traffic', trafficRouter);
 app.use('/api/v1/soc', socRouter);
 app.use('/api/v1/audit', auditRouter);
 app.use('/api/v1/scanner', scannerRouter);
+app.use('/api/v1/zeek', zeekRouter);
+app.use('/api/soc/zeek', zeekRouter);
 
 // Root health check
 app.get('/health', (req, res) => {
