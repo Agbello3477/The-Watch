@@ -291,14 +291,14 @@ export const App: React.FC = () => {
         {/* 3-Minute Session Inactivity Timeout Notification Modal */}
         {sessionTimeoutNotice && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
-            <div className="relative w-full max-w-sm bg-slate-900 border border-amber-500/50 rounded-2xl p-6 shadow-2xl shadow-amber-950/60 text-center space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+            <div className="relative w-full max-w-sm bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl text-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center mx-auto text-yellow-400">
                 <ShieldAlert className="w-6 h-6 animate-pulse" />
               </div>
 
               <div>
-                <h3 className="text-base font-bold text-white">Session Timed Out</h3>
-                <p className="text-xs text-slate-300 mt-1 font-mono">
+                <h3 className="text-base font-bold text-slate-100">Session Timed Out</h3>
+                <p className="text-xs text-slate-400 mt-1 font-mono">
                   For security compliance, your active session was terminated following 3 minutes of inactivity.
                 </p>
               </div>
@@ -308,7 +308,7 @@ export const App: React.FC = () => {
                   setSessionTimeoutNotice(false);
                   setIsLoginModalOpen(true);
                 }}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs transition shadow-lg shadow-cyan-500/25 cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white border border-blue-500/40 font-bold text-xs transition shadow-sm cursor-pointer"
               >
                 Sign In Again
               </button>
