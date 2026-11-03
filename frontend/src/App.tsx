@@ -354,37 +354,37 @@ export const App: React.FC = () => {
             {/* Platform Reliability Gauges */}
             <HealthGaugeCard overview={overview} />
 
-            {/* Sub-Navigation Tabs */}
-            <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide items-center justify-between gap-3 border-b border-slate-800 pb-3" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 shrink-0">
+            {/* Sub-Navigation Tabs (SOC Neutral & Primary Action Hierarchy) */}
+            <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide items-center justify-between gap-3 border-b border-slate-700 pb-3" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-slate-700 shrink-0">
                 
                 <button
                   onClick={() => setActiveSocTab('soc')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                     activeSocTab === 'soc'
-                      ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg shadow-red-600/30'
-                      : 'text-red-400 hover:text-red-300 hover:bg-slate-800/60'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
                   }`}
                 >
-                  <ShieldAlert className="w-3.5 h-3.5 animate-pulse" />
+                  <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
                   <span>SOC War Room & Ops</span>
-                  <span className="bg-red-950 text-red-300 border border-red-800 text-[10px] font-mono px-1.5 py-0.2 rounded-full">
+                  <span className="bg-red-500/10 text-red-400 border border-red-500/30 text-[10px] font-mono px-1.5 py-0.2 rounded">
                     LIVE
                   </span>
                 </button>
 
                 <button
                   onClick={() => setActiveSocTab('threats')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                     activeSocTab === 'threats'
-                      ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
                   }`}
                 >
                   <Globe className="w-3.5 h-3.5" />
                   <span>Threat Radar & Incidents</span>
                   {(overview?.unresolvedIncidents || 0) > 0 && (
-                    <span className="bg-red-500 text-white text-[10px] font-mono px-1.5 py-0.2 rounded-full">
+                    <span className="bg-red-500/10 text-red-400 border border-red-500/30 text-[10px] font-mono px-1.5 py-0.2 rounded">
                       {overview?.unresolvedIncidents}
                     </span>
                   )}
@@ -392,10 +392,10 @@ export const App: React.FC = () => {
 
                 <button
                   onClick={() => setActiveSocTab('observability')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                     activeSocTab === 'observability'
-                      ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
                   }`}
                 >
                   <Activity className="w-3.5 h-3.5" />
@@ -404,10 +404,10 @@ export const App: React.FC = () => {
 
                 <button
                   onClick={() => setActiveSocTab('advisor')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                     activeSocTab === 'advisor'
-                      ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
                   }`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
@@ -416,10 +416,10 @@ export const App: React.FC = () => {
 
                 <button
                   onClick={() => setActiveSocTab('reports')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                     activeSocTab === 'reports'
-                      ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5" />
@@ -428,10 +428,10 @@ export const App: React.FC = () => {
 
                 <button
                   onClick={() => setActiveSocTab('simulator')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                     activeSocTab === 'simulator'
-                      ? 'bg-orange-500 text-slate-950 shadow-lg shadow-orange-500/20'
-                      : 'text-orange-400 hover:text-orange-300'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
                   }`}
                 >
                   <Flame className="w-3.5 h-3.5" />
@@ -440,10 +440,10 @@ export const App: React.FC = () => {
 
                 <button
                   onClick={() => setActiveSocTab('traffic')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                     activeSocTab === 'traffic'
-                      ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
-                      : 'text-emerald-400 hover:text-emerald-300'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
                   }`}
                 >
                   <Activity className="w-3.5 h-3.5" />
@@ -452,10 +452,10 @@ export const App: React.FC = () => {
 
                 <button
                   onClick={() => setActiveSocTab('scanner')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                     activeSocTab === 'scanner'
-                      ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-400/20'
-                      : 'text-cyan-300 hover:text-cyan-200'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
                   }`}
                 >
                   <Radar className="w-3.5 h-3.5" />
@@ -464,10 +464,10 @@ export const App: React.FC = () => {
 
                 <button
                   onClick={() => setActiveSocTab('zeek')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                     activeSocTab === 'zeek'
-                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
-                      : 'text-indigo-300 hover:text-indigo-200'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
                   }`}
                 >
                   <Network className="w-3.5 h-3.5" />
@@ -476,10 +476,10 @@ export const App: React.FC = () => {
 
                 <button
                   onClick={() => setActiveSocTab('connect')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                     activeSocTab === 'connect'
-                      ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
-                      : 'text-cyan-400 hover:text-cyan-300'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
                   }`}
                 >
                   <Globe className="w-3.5 h-3.5" />

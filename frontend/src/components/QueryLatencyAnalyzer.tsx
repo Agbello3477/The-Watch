@@ -1,6 +1,7 @@
 import React from 'react';
-import { Database, AlertTriangle, Cpu, TrendingUp, Zap } from 'lucide-react';
+import { Database, Cpu } from 'lucide-react';
 import { QueryMetricsResponse } from '../types/dashboard';
+import { SocSeverityBadge } from './SocThemeBadge';
 
 interface QueryLatencyAnalyzerProps {
   data: QueryMetricsResponse | null;
@@ -19,14 +20,14 @@ export const QueryLatencyAnalyzer: React.FC<QueryLatencyAnalyzerProps> = ({ data
   const metrics = data?.metrics || [];
 
   return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-sm">
+    <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 shadow-sm">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <div className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-base font-bold text-white tracking-wide">DATABASE QUERY OBSERVABILITY & LATENCY PROFILER</h2>
+            <Database className="w-5 h-5 text-blue-400" />
+            <h2 className="text-base font-bold text-slate-100 tracking-wide">DATABASE QUERY OBSERVABILITY & LATENCY PROFILER</h2>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
             Real-time tracking of database query latency, pool saturation events, and queries exceeding 200ms threshold
@@ -34,11 +35,11 @@ export const QueryLatencyAnalyzer: React.FC<QueryLatencyAnalyzerProps> = ({ data
         </div>
 
         {/* Pool Saturation Indicator */}
-        <div className="flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-xs">
+        <div className="flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
           <span className="flex items-center gap-1 text-slate-400">
-            <Cpu className="w-3.5 h-3.5 text-cyan-400" /> Pool:
+            <Cpu className="w-3.5 h-3.5 text-blue-400" /> Pool:
           </span>
-          <span className="font-mono font-bold text-slate-200">
+          <span className="font-mono font-bold text-slate-100">
             {summary.poolActiveConnections} Active / {summary.poolIdleConnections} Idle
           </span>
         </div>
@@ -46,24 +47,24 @@ export const QueryLatencyAnalyzer: React.FC<QueryLatencyAnalyzerProps> = ({ data
 
       {/* Query Metrics Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+        <div className="bg-slate-950 p-3 rounded-lg border border-slate-700">
           <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Queries Tracked</span>
-          <span className="text-lg font-black text-white font-mono mt-0.5 block">{summary.totalLogged}</span>
+          <span className="text-lg font-black text-slate-100 font-mono mt-0.5 block">{summary.totalLogged}</span>
         </div>
 
-        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+        <div className="bg-slate-950 p-3 rounded-lg border border-slate-700">
           <span className="text-[10px] uppercase font-bold text-slate-400 block">Queries &gt; 200ms</span>
-          <span className={`text-lg font-black font-mono mt-0.5 block ${summary.slowQueriesCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+          <span className={`text-lg font-black font-mono mt-0.5 block ${summary.slowQueriesCount > 0 ? 'text-yellow-400' : 'text-emerald-400'}`}>
             {summary.slowQueriesCount} Flagged
           </span>
         </div>
 
-        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+        <div className="bg-slate-950 p-3 rounded-lg border border-slate-700">
           <span className="text-[10px] uppercase font-bold text-slate-400 block">Average Latency</span>
-          <span className="text-lg font-black text-slate-200 font-mono mt-0.5 block">{summary.avgDurationMs} ms</span>
+          <span className="text-lg font-black text-slate-100 font-mono mt-0.5 block">{summary.avgDurationMs} ms</span>
         </div>
 
-        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
+        <div className="bg-slate-950 p-3 rounded-lg border border-slate-700">
           <span className="text-[10px] uppercase font-bold text-slate-400 block">Max Peak Latency</span>
           <span className="text-lg font-black text-red-400 font-mono mt-0.5 block">{summary.maxDurationMs} ms</span>
         </div>
@@ -73,7 +74,7 @@ export const QueryLatencyAnalyzer: React.FC<QueryLatencyAnalyzerProps> = ({ data
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider bg-slate-950/60">
+            <tr className="border-b border-slate-700 text-slate-400 font-semibold uppercase tracking-wider bg-slate-950">
               <th className="py-2.5 px-3">Status</th>
               <th className="py-2.5 px-3">System</th>
               <th className="py-2.5 px-3">SQL Query Text</th>
@@ -82,7 +83,7 @@ export const QueryLatencyAnalyzer: React.FC<QueryLatencyAnalyzerProps> = ({ data
               <th className="py-2.5 px-3">Timestamp</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 font-mono">
+          <tbody className="divide-y divide-slate-700 font-mono">
             {metrics.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-6 text-center text-slate-500 font-sans font-semibold">
@@ -93,26 +94,22 @@ export const QueryLatencyAnalyzer: React.FC<QueryLatencyAnalyzerProps> = ({ data
               metrics.slice(0, 8).map((m) => {
                 const isSlow = m.exceeded_threshold || m.duration_ms > 200;
                 return (
-                  <tr key={m.id} className="hover:bg-slate-800/30 transition">
+                  <tr key={m.id} className="odd:bg-slate-900 even:bg-slate-800/35 hover:bg-slate-800/80 transition">
                     <td className="py-2.5 px-3">
                       {isSlow ? (
-                        <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[10px] font-bold">
-                          SLOW &gt;200ms
-                        </span>
+                        <SocSeverityBadge severity="MEDIUM" label="SLOW >200ms" />
                       ) : (
-                        <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-bold">
-                          FAST
-                        </span>
+                        <SocSeverityBadge severity="RESOLVED" label="FAST" />
                       )}
                     </td>
 
-                    <td className="py-2.5 px-3 text-cyan-400 font-bold">{m.system_id}</td>
+                    <td className="py-2.5 px-3 text-blue-400 font-bold">{m.system_id}</td>
 
-                    <td className="py-2.5 px-3 max-w-md truncate text-slate-300">
+                    <td className="py-2.5 px-3 max-w-md truncate text-slate-200">
                       {m.query_text}
                     </td>
 
-                    <td className={`py-2.5 px-3 font-bold ${isSlow ? 'text-amber-400' : 'text-slate-200'}`}>
+                    <td className={`py-2.5 px-3 font-bold ${isSlow ? 'text-yellow-400' : 'text-slate-100'}`}>
                       {m.duration_ms} ms
                     </td>
 

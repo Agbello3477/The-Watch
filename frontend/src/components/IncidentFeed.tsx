@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { ThreatIncident } from '../types/dashboard';
 import { api } from '../services/api';
+import { SocSeverityBadge } from './SocThemeBadge';
 
 interface IncidentFeedProps {
   incidents: ThreatIncident[];
@@ -113,38 +114,34 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
   });
 
   const getSeverityBadge = (severity: string) => {
-    switch (severity) {
-      case 'CRITICAL':
-        return <span className="bg-red-500/20 text-red-400 border border-red-500/40 px-2 py-0.5 rounded text-[10px] font-bold">CRITICAL</span>;
-      case 'HIGH':
-        return <span className="bg-orange-500/20 text-orange-400 border border-orange-500/40 px-2 py-0.5 rounded text-[10px] font-bold">HIGH</span>;
-      case 'MEDIUM':
-        return <span className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-2 py-0.5 rounded text-[10px] font-bold">MEDIUM</span>;
-      default:
-        return <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded text-[10px] font-bold">LOW</span>;
-    }
+    return (
+      <SocSeverityBadge
+        severity={severity}
+        pulse={severity === 'CRITICAL'}
+      />
+    );
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'ACKNOWLEDGED':
-        return <span className="text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-0.5 rounded text-[10px] font-semibold">ACKNOWLEDGED</span>;
+        return <SocSeverityBadge severity="MEDIUM" label="ACKNOWLEDGED" />;
       case 'RESOLVED':
-        return <span className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-semibold">RESOLVED</span>;
+        return <SocSeverityBadge severity="RESOLVED" label="RESOLVED" />;
       default:
-        return <span className="text-red-400 bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded text-[10px] font-semibold animate-pulse">UNRESOLVED</span>;
+        return <SocSeverityBadge severity="CRITICAL" label="UNRESOLVED" pulse />;
     }
   };
 
   return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 shadow-sm">
+    <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 shadow-sm">
       
       {/* Header & Filters */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
         <div>
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-red-400" />
-            <h2 className="text-base font-bold text-white tracking-wide">REAL-TIME THREAT & INCIDENT TRIAGE DESK</h2>
+            <h2 className="text-base font-bold text-slate-100 tracking-wide">REAL-TIME THREAT & INCIDENT TRIAGE DESK</h2>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
             Prioritized security incidents, injection attempts, and proactive remediation logs
@@ -154,13 +151,13 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
         {/* Filter Controls */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Severity Filters */}
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-1 text-xs">
+          <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg p-1 text-xs">
             {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM'].map((sev) => (
               <button
                 key={sev}
                 onClick={() => setSeverityFilter(sev)}
                 className={`px-2.5 py-1 rounded font-semibold transition ${
-                  severityFilter === sev ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                  severityFilter === sev ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {sev}
@@ -169,13 +166,13 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
           </div>
 
           {/* Status Filters */}
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-1 text-xs">
+          <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg p-1 text-xs">
             {['ALL', 'UNRESOLVED', 'RESOLVED'].map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
                 className={`px-2.5 py-1 rounded font-semibold transition ${
-                  statusFilter === st ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                  statusFilter === st ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-100'
                 }`}
               >
                 {st}
@@ -229,7 +226,7 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse text-xs block md:table">
           <thead className="hidden md:table-header-group">
-            <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider bg-slate-950/60">
+            <tr className="border-b border-slate-700 text-slate-400 font-semibold uppercase tracking-wider bg-slate-950">
               <th className="py-3 px-3">Severity & Threat</th>
               <th className="py-3 px-3">System</th>
               <th className="py-3 px-3">Target Vector</th>
@@ -239,7 +236,7 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
               <th className="py-3 px-3 text-right">Triage Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60 block md:table-row-group">
+          <tbody className="divide-y divide-slate-700 block md:table-row-group">
             {filteredIncidents.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-8 text-center text-slate-500 font-semibold">
@@ -248,26 +245,26 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
               </tr>
             ) : (
               filteredIncidents.map((inc) => (
-                <tr key={inc.id} className="hover:bg-slate-800/40 transition block md:table-row bg-slate-900/40 md:bg-transparent rounded-lg md:rounded-none mb-3 md:mb-0 p-3 md:p-0 border border-slate-800/60 md:border-none">
+                <tr key={inc.id} className="odd:bg-slate-900 even:bg-slate-800/35 hover:bg-slate-800/80 transition block md:table-row rounded-lg md:rounded-none mb-3 md:mb-0 p-3 md:p-0 border border-slate-700 md:border-none">
                   <td className="py-2 md:py-3 px-0 md:px-3 block md:table-cell">
                     <div className="flex items-center gap-2">
                       {getSeverityBadge(inc.severity)}
-                      <span className="font-bold text-slate-200">{inc.threat_classification}</span>
+                      <span className="font-bold text-slate-100">{inc.threat_classification}</span>
                     </div>
                   </td>
 
                   <td className="py-2 md:py-3 px-0 md:px-3 block md:table-cell">
-                    <span className="font-mono text-cyan-400 font-semibold">{inc.system_id}</span>
+                    <span className="font-mono text-blue-400 font-semibold">{inc.system_id}</span>
                   </td>
 
                   <td className="py-2 md:py-3 px-0 md:px-3 block md:table-cell">
-                    <div className="font-mono text-slate-300 max-w-xs truncate">
-                      <span className="text-amber-400 font-bold">{inc.http_method}</span> {inc.target_endpoint}
+                    <div className="font-mono text-slate-200 max-w-xs truncate">
+                      <span className="text-slate-400 font-bold">{inc.http_method}</span> {inc.target_endpoint}
                     </div>
                   </td>
 
                   <td className="py-2 md:py-3 px-0 md:px-3 block md:table-cell">
-                    <div className="text-slate-300 font-mono text-[11px]">
+                    <div className="text-slate-200 font-mono text-[11px]">
                       <span>{inc.offending_ip}</span>
                       <span className="text-slate-500 text-[10px] block">
                         {inc.geo_city}, {inc.geo_country} ({inc.asn})
@@ -275,7 +272,7 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
                     </div>
                   </td>
 
-                  <td className="py-2 md:py-3 px-0 md:px-3 text-slate-400 font-mono text-[11px] whitespace-nowrap block md:table-cell">
+                  <td className="py-2 md:py-3 px-0 md:px-3 text-slate-500 font-mono text-[11px] whitespace-nowrap block md:table-cell">
                     {inc.created_at_wat}
                   </td>
 
@@ -283,14 +280,14 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
                     {getStatusBadge(inc.status)}
                   </td>
 
-                  <td className="py-2 md:py-3 px-0 md:px-3 block md:table-cell text-left md:text-right whitespace-nowrap mt-2 md:mt-0 pt-3 md:pt-0 border-t border-slate-800 md:border-none">
+                  <td className="py-2 md:py-3 px-0 md:px-3 block md:table-cell text-left md:text-right whitespace-nowrap mt-2 md:mt-0 pt-3 md:pt-0 border-t border-slate-700 md:border-none">
                     <div className="flex items-center justify-start md:justify-end gap-1.5 flex-wrap">
                       <button
                         onClick={() => handleTraceIp(inc)}
                         title="Trace Attacker IP Origin & Multi-Hop Route"
-                        className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
                       >
-                        <Crosshair className="w-3 h-3" />
+                        <Crosshair className="w-3 h-3 text-blue-400" />
                         <span>Trace IP</span>
                       </button>
 
@@ -322,7 +319,7 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
                           })
                         }
                         title="Download Forensic Incident Report (PDF)"
-                        className="p-1.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 transition cursor-pointer"
+                        className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5" />
                       </button>
@@ -333,7 +330,7 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
                           setTraceData(null);
                         }}
                         title="View Forensic Details & Mitigation Blueprint"
-                        className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                        className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
@@ -343,7 +340,7 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
                           onClick={(e) => handleAction(e, inc.id, 'ACKNOWLEDGED')}
                           disabled={loadingActionId === inc.id}
                           title="Acknowledge Incident"
-                          className="px-2.5 py-1 rounded bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/40 text-[10px] font-bold transition flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                          className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 text-[10px] font-bold transition flex items-center gap-1 disabled:opacity-50 cursor-pointer"
                         >
                           {loadingActionId === inc.id ? (
                             <RefreshCw className="w-2.5 h-2.5 animate-spin" />
@@ -357,7 +354,7 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
                           onClick={(e) => handleBlockAndResolve(e, inc)}
                           disabled={loadingActionId === inc.id}
                           title="Block Attacker IP & Resolve Incident"
-                          className="px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-[10px] font-bold transition flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                          className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold transition flex items-center gap-1 disabled:opacity-50 cursor-pointer"
                         >
                           {loadingActionId === inc.id ? (
                             <>
@@ -372,9 +369,7 @@ export const IncidentFeed: React.FC<IncidentFeedProps> = ({ incidents, onUpdateS
                           )}
                         </button>
                       ) : (
-                        <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-mono flex items-center gap-1">
-                          <Check className="w-3 h-3 text-emerald-400" /> Blocked & Resolved
-                        </span>
+                        <SocSeverityBadge severity="RESOLVED" label="Blocked & Resolved" />
                       )}
                     </div>
                   </td>

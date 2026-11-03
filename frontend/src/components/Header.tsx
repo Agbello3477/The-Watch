@@ -74,25 +74,25 @@ export const Header: React.FC<HeaderProps> = ({
       case 'CRITICAL':
         return {
           label: 'CRITICAL',
-          badgeClass: 'bg-rose-500/15 text-rose-400 border-rose-500/40',
-          dotClass: 'bg-rose-500 animate-pulse',
+          badgeClass: 'bg-red-500/10 text-red-400 border-red-500/30',
+          dotClass: 'bg-red-500 animate-pulse',
         };
       case 'SEVERE':
         return {
           label: 'SEVERE',
-          badgeClass: 'bg-orange-500/15 text-orange-400 border-orange-500/40',
+          badgeClass: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
           dotClass: 'bg-orange-500',
         };
       case 'ELEVATED':
         return {
           label: 'ELEVATED',
-          badgeClass: 'bg-amber-500/15 text-amber-300 border-amber-500/40',
-          dotClass: 'bg-amber-400 animate-ping-slow',
+          badgeClass: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30',
+          dotClass: 'bg-yellow-400 animate-pulse',
         };
       default:
         return {
           label: 'NORMAL',
-          badgeClass: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40',
+          badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
           dotClass: 'bg-emerald-400',
         };
     }
@@ -154,13 +154,13 @@ export const Header: React.FC<HeaderProps> = ({
         {/* ─── CENTER: High-Resolution Operations Bar ─── */}
         <div className="hidden 2xl:flex items-center gap-2 shrink-0">
           {/* Segmented View Switcher */}
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
+          <div className="flex items-center bg-slate-950 border border-slate-700 rounded-xl p-0.5">
             <button
               onClick={onGoHome}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
                 activeTab === 'home' 
-                  ? 'bg-slate-800 text-cyan-400 font-bold shadow-sm' 
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600 text-white font-bold shadow-sm' 
+                  : 'text-slate-400 hover:text-slate-100'
               }`}
             >
               <Home className="w-3.5 h-3.5" />
@@ -171,8 +171,8 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => onTabChange('overview')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
                 activeTab !== 'home' && activeTab !== 'users' 
-                  ? 'bg-slate-800 text-cyan-400 font-bold shadow-sm' 
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-blue-600 text-white font-bold shadow-sm' 
+                  : 'text-slate-400 hover:text-slate-100'
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -184,8 +184,8 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => onTabChange('users')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
                   activeTab === 'users' 
-                    ? 'bg-indigo-950 text-indigo-300 font-bold border border-indigo-700/60 shadow-sm' 
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-blue-600 text-white font-bold shadow-sm' 
+                    : 'text-slate-400 hover:text-slate-100'
                 }`}
               >
                 <Users className="w-3.5 h-3.5" />
@@ -195,12 +195,12 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* System Dropdown */}
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1">
+          <div className="flex items-center bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1">
             <Layers className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
             <select
               value={selectedSystem}
               onChange={(e) => onSelectSystem(e.target.value)}
-              className="bg-transparent text-xs font-medium text-slate-200 focus:outline-none cursor-pointer pr-1"
+              className="bg-transparent text-xs font-medium text-slate-100 focus:outline-none cursor-pointer pr-1"
             >
               <option value="" className="bg-slate-900 text-slate-100">All Systems (Universal)</option>
               <option value="NOUN-HRMS" className="bg-slate-900 text-slate-100">NOUN-HRMS (Flagship)</option>
@@ -281,16 +281,16 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onLogout}
                 title="Sign Out of SOC Session"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 hover:text-white border border-rose-800/80 hover:border-rose-600 transition shadow-sm cursor-pointer shrink-0"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition shadow-sm cursor-pointer shrink-0"
               >
-                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <LogOut className="w-3.5 h-3.5 text-slate-400" />
                 <span className="text-xs font-bold font-mono">Logout</span>
               </button>
             </div>
           ) : (
             <button
               onClick={onOpenLogin}
-              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-md shadow-cyan-500/20 transition cursor-pointer shrink-0"
+              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer shrink-0"
             >
               <KeyRound className="w-3.5 h-3.5" />
               <span>Sign In</span>

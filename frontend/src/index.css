@@ -2,38 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: dark;
+  /* A. Neutral & Structural Palette (80% Visual Mass) */
+  --soc-bg-root: #0B0F19;
+  --soc-bg-surface: #161B26;
+  --soc-bg-elevated: #1F2937;
+  --soc-border: #2D3748;
+  --soc-focus-stroke: #4B5563;
+
+  /* B. Typographic Hierarchy (15% Visual Mass) */
+  --soc-text-primary: #F8FAFC;
+  --soc-text-heading: #E2E8F0;
+  --soc-text-secondary: #94A3B8;
+  --soc-text-muted: #64748B;
+
+  /* C. Semantic Threat & Status Accents (5% Visual Mass - Strict Usage Only) */
+  --soc-threat-critical: #EF4444;
+  --soc-threat-high: #F97316;
+  --soc-threat-medium: #EAB308;
+  --soc-threat-low: #3B82F6;
+  --soc-threat-resolved: #10B981;
+}
+
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 font-sans antialiased overflow-x-hidden;
+    background-color: var(--soc-bg-root);
+    color: var(--soc-text-primary);
+    @apply antialiased selection:bg-blue-500/30 selection:text-[#F8FAFC];
+    overflow-x: hidden;
+  }
+
+  /* Custom SOC Scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--soc-bg-root);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--soc-border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--soc-focus-stroke);
   }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #0f172a;
-}
-::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+@layer components {
+  /* SOC Card & Panel Surfaces */
+  .soc-card {
+    background-color: var(--soc-bg-surface);
+    border: 1px solid var(--soc-border);
+    @apply rounded-xl shadow-lg;
+  }
+
+  .soc-elevated {
+    background-color: var(--soc-bg-elevated);
+    border: 1px solid var(--soc-border);
+    @apply rounded-xl shadow-2xl;
+  }
+
+  /* SOC Interactive Buttons */
+  .soc-btn-default {
+    @apply bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition-colors focus:outline-none focus:ring-1 focus:ring-[#4B5563];
+  }
+
+  .soc-btn-primary {
+    @apply bg-blue-600 hover:bg-blue-500 text-white border border-blue-500/40 transition-colors focus:outline-none focus:ring-1 focus:ring-blue-400;
+  }
+
+  /* SOC Input & Search Bar */
+  .soc-input {
+    background-color: var(--soc-bg-root);
+    border: 1px solid var(--soc-border);
+    color: var(--soc-text-primary);
+    @apply rounded-lg focus:outline-none focus:border-[#4B5563] placeholder:text-[#64748B] transition-colors;
+  }
+
+  /* SOC High-Density Table Zebra & Grid */
+  .soc-table-row {
+    border-bottom: 1px solid var(--soc-border);
+    @apply odd:bg-[#161B26] even:bg-[#1F2937]/35 hover:bg-[#1F2937]/80 transition-colors;
+  }
 }
 
-.radar-sweep {
-  background: conic-gradient(from 0deg at 50% 50%, rgba(56, 189, 248, 0) 0deg, rgba(56, 189, 248, 0.25) 300deg, rgba(56, 189, 248, 0.7) 360deg);
-  animation: radar-spin 4s linear infinite;
-}
-
-@keyframes radar-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.recharts-default-tooltip {
+  background-color: #1F2937 !important;
+  border-color: #2D3748 !important;
+  border-radius: 0.5rem !important;
+  color: #F8FAFC !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
 }

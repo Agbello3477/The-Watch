@@ -17,6 +17,7 @@ import {
   ShiftHandover,
   AuthSessionUser,
 } from '../types/dashboard';
+import { SocSeverityBadge } from './SocThemeBadge';
 
 interface SocCommandCenterProps {
   currentUser: AuthSessionUser | null;
@@ -228,15 +229,15 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
             <button
               onClick={fetchSocData}
               disabled={refreshing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-100 border border-slate-700 transition"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-cyan-400' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-blue-400' : ''}`} />
               <span>Refresh SOC</span>
             </button>
 
             <button
               onClick={() => setIsBanModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-xs font-bold text-white shadow-lg shadow-red-600/20 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-sm transition"
             >
               <Ban className="w-3.5 h-3.5" />
               <span>Quarantine IP</span>
@@ -316,7 +317,7 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
       </div>
 
       {/* ─── 2. SOC SUB-NAVIGATION TABS ───────────────────────── */}
-      <div className="flex border-b border-slate-800 overflow-x-auto gap-2 pb-1 scrollbar-none">
+      <div className="flex border-b border-slate-700 overflow-x-auto gap-2 pb-1 scrollbar-none">
         {[
           { id: 'cases', label: 'Triage & War Room (Cases)', icon: ShieldAlert, badge: cases.filter((c) => c.status !== 'RESOLVED').length },
           { id: 'firewall', label: 'Ingest Firewall & IP Blocklist', icon: Ban, badge: blocklist.filter((b) => b.status === 'ACTIVE').length },
@@ -334,16 +335,16 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
               onClick={() => setActiveSubTab(tab.id as any)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap border ${
                 isActive
-                  ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-lg shadow-cyan-500/20'
-                  : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
               {tab.badge !== undefined && (
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                    isActive ? 'bg-slate-950 text-cyan-400' : 'bg-slate-800 text-slate-300'
+                  className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                    isActive ? 'bg-slate-950/80 text-white' : 'bg-slate-900 text-slate-300 border border-slate-700'
                   }`}
                 >
                   {tab.badge}
@@ -413,31 +414,22 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-black font-mono tracking-wider ${
-                            isP1
-                              ? 'bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse'
-                              : 'bg-orange-500/20 text-orange-400 border border-orange-500/40'
-                          }`}
-                        >
-                          {socCase.severity}
-                        </span>
+                        <SocSeverityBadge severity={socCase.severity} pulse={isP1} />
                         <span className="text-xs font-mono text-slate-400">{socCase.id}</span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-blue-400 border border-slate-700">
                           {socCase.tier}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span
-                          className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                        <SocSeverityBadge
+                          severity={
                             socCase.status === 'CONTAINED' || socCase.status === 'RESOLVED'
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                          }`}
-                        >
-                          {socCase.status}
-                        </span>
+                              ? 'RESOLVED'
+                              : 'MEDIUM'
+                          }
+                          label={socCase.status}
+                        />
                       </div>
                     </div>
 
@@ -505,16 +497,16 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
                 </div>
 
                 {/* SOAR Playbook Execution Button */}
-                <div className="bg-indigo-950/30 border border-indigo-900/50 rounded-xl p-3.5 space-y-2">
-                  <div className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
-                    <Play className="w-3.5 h-3.5 text-indigo-400" /> Automated SOAR Containment
+                <div className="bg-slate-950 border border-slate-700 rounded-xl p-3.5 space-y-2">
+                  <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                    <Play className="w-3.5 h-3.5 text-blue-400" /> Automated SOAR Containment
                   </div>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
                     Trigger the pre-configured response playbook to instantly quarantine IP {selectedCase.offendingIp} and terminate hanging sessions.
                   </p>
                   <button
                     onClick={() => handleExecutePlaybook('PB-SQLI-01', selectedCase.id)}
-                    className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-1.5"
+                    className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-sm transition flex items-center justify-center gap-1.5"
                   >
                     <Play className="w-3 h-3" />
                     <span>Run PB-SQLI-01 Containment Playbook</span>
@@ -796,10 +788,10 @@ ${blocklist.filter((b) => b.status === 'ACTIVE').map((b) => `deny ${b.ip};`).joi
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-800">
+                <div className="pt-3 border-t border-slate-700">
                   <button
                     onClick={() => handleExecutePlaybook(pb.id)}
-                    className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition flex items-center justify-center gap-2"
+                    className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-sm transition flex items-center justify-center gap-2"
                   >
                     <Play className="w-3.5 h-3.5" />
                     <span>Execute Playbook Now</span>
@@ -851,13 +843,7 @@ ${blocklist.filter((b) => b.status === 'ACTIVE').map((b) => `deny ${b.ip};`).joi
                       <td className="px-5 py-3 font-bold text-slate-100">{ioc.value}</td>
                       <td className="px-5 py-3 text-slate-400">{ioc.threatActor || 'Unknown'}</td>
                       <td className="px-5 py-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            ioc.severity === 'CRITICAL' ? 'bg-red-950 text-red-400' : 'bg-orange-950 text-orange-400'
-                          }`}
-                        >
-                          {ioc.severity}
-                        </span>
+                        <SocSeverityBadge severity={ioc.severity} />
                       </td>
                       <td className="px-5 py-3 text-emerald-400 font-bold">{ioc.confidence}%</td>
                       <td className="px-5 py-3 text-slate-300">{ioc.mitreTechnique}</td>
@@ -900,19 +886,9 @@ ${blocklist.filter((b) => b.status === 'ACTIVE').map((b) => `deny ${b.ip};`).joi
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-cyan-400">{rule.id}</span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
-                        rule.severity === 'CRITICAL'
-                          ? 'bg-red-950 text-red-400'
-                          : rule.severity === 'HIGH'
-                          ? 'bg-orange-950 text-orange-400'
-                          : 'bg-amber-950 text-amber-300'
-                      }`}
-                    >
-                      {rule.severity}
-                    </span>
-                    <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded">
+                    <span className="text-xs font-mono font-bold text-blue-400">{rule.id}</span>
+                    <SocSeverityBadge severity={rule.severity} />
+                    <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-700">
                       {rule.mitreTechnique}
                     </span>
                   </div>
