@@ -459,7 +459,7 @@ export const App: React.FC = () => {
                   }`}
                 >
                   <Radar className="w-3.5 h-3.5" />
-                  <span>Port &amp; Vuln Scanner</span>
+                  <span>Nmap &amp; Vuln Scanner</span>
                 </button>
 
                 <button
