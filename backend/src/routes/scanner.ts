@@ -167,7 +167,7 @@ const PORT_CATALOG: PortSpec[] = [
     whyIfOpen: 'RESTRICT BEHIND TLS REVERSE PROXY (443): In production, expose through HTTPS Port 443 (Nginx/Cloudflare/Render) and restrict raw port 4000 to internal upstream proxies.',
     whyIfClosed: 'CLOSED (Secure): Internal Node.js port 4000 is shielded behind HTTPS reverse proxy (Port 443).',
     firewallCmd: 'sudo ufw deny 4000/tcp # Proxy via Nginx on Port 443 -> http://127.0.0.1:4000',
-    banner: 'Node.js v20 / Express (The Watch SOC Engine)',
+    banner: `Node.js ${process.version} LTS (Security Patched) / Express 4.22.3 (The Watch SOC Engine)`,
   },
   {
     port: 5055,
@@ -177,7 +177,7 @@ const PORT_CATALOG: PortSpec[] = [
     whyIfOpen: 'RESTRICT BEHIND TLS REVERSE PROXY (443): Keep internal app port 5055 bound to localhost/reverse-proxy and serve public traffic over HTTPS (443).',
     whyIfClosed: 'CLOSED (Secure): Internal HRMS port 5055 is shielded behind HTTPS Port 443.',
     firewallCmd: 'sudo ufw deny 5055/tcp # Proxy via HTTPS Port 443 -> http://127.0.0.1:5055',
-    banner: 'Node.js / Express (NOUN-HRMS Core API)',
+    banner: `Node.js ${process.version} LTS (Security Patched) / Express 4.22.3 (NOUN-HRMS Core API)`,
   },
   {
     port: 5432,

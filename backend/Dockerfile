@@ -1,5 +1,5 @@
-# Build Stage
-FROM node:20-alpine AS builder
+# Build Stage (Latest Node.js 22 LTS Security-Patched Alpine Image)
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -10,14 +10,14 @@ COPY tsconfig.json ./
 COPY src/ ./src/
 RUN npm run build
 
-# Production Stage
-FROM node:20-alpine AS runner
+# Production Stage (Hardened Node.js 22 LTS)
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package*.json ./
-RUN npm install --only=production
+RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
 COPY src/db/schema.sql ./dist/db/schema.sql

@@ -31,9 +31,29 @@ const THE_WATCH_URL    = process.env.THE_WATCH_URL    || 'http://localhost:4000'
 const THE_WATCH_KEY    = process.env.THE_WATCH_API_KEY || 'tel_sec_noun_hrms_98234';
 const THE_WATCH_SYSTEM = process.env.THE_WATCH_SYSTEM_ID || 'NOUN-HRMS';
 const INGEST_ENDPOINT  = `${THE_WATCH_URL.replace(/\/$/, '')}/api/v1/telemetry/ingest`;
+const BLOCKLIST_URL    = `${THE_WATCH_URL.replace(/\/$/, '')}/api/v1/soc/blocklist/active-ips`;
 const AUDIT_ENDPOINT   = `${THE_WATCH_URL.replace(/\/$/, '')}/api/v1/audit/track`;
 const EMERGENCY_PHONE  = '+2347063054357';
 const EMERGENCY_EMAIL  = 'abdulgaffarbello3477@gmail.com';
+
+// Live in-memory set of permanently blocked IPs synced from The Watch Super Admin Blocklist
+const blockedIps = new Set<string>();
+
+function syncBlocklistFromWatch(): void {
+  fetch(BLOCKLIST_URL, {
+    headers: { 'X-Telemetry-Key': THE_WATCH_KEY },
+  })
+    .then((r) => r.json())
+    .then((data: any) => {
+      if (Array.isArray(data?.activeIps)) {
+        blockedIps.clear();
+        data.activeIps.forEach((ip: string) => blockedIps.add(String(ip).trim()));
+      }
+    })
+    .catch(() => {});
+}
+syncBlocklistFromWatch();
+setInterval(syncBlocklistFromWatch, 10000);
 
 // Direct Failover Relay when The Watch Server is Shut Down or Unreachable
 function triggerDirectEmergencyFailover(summary: string, details: Record<string, any>): void {
@@ -105,6 +125,33 @@ export function shipUserAudit(audit: {
 
 // ─── Middleware ──────────────────────────────────────────────
 export function sentinelAgent(req: Request, res: Response, next: NextFunction): void {
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+    || req.socket?.remoteAddress
+    || req.ip
+    || '127.0.0.1';
+
+  // Enforce Permanent SOC IP Blocklist BEFORE executing any HRMS route
+  if (blockedIps.has(clientIp)) {
+    shipTelemetry({
+      systemId: THE_WATCH_SYSTEM,
+      method: req.method,
+      path: req.originalUrl || req.path,
+      statusCode: 403,
+      latencyMs: 1,
+      clientIp,
+      userAgent: req.headers['user-agent'],
+      payloadSnippet: `[BLOCKED_BY_SOC_FIREWALL] Quarantined IP (${clientIp}) denied access on ${THE_WATCH_SYSTEM}`,
+      timestamp: new Date().toISOString(),
+    });
+    res.status(403).json({
+      error: 'IP_QUARANTINED_BY_THE_WATCH_SOC',
+      code: 'IP_QUARANTINED',
+      message: `ACCESS PERMANENTLY DENIED: Your IP address (${clientIp}) is blocked across both ${THE_WATCH_SYSTEM} and The Watch SOC. Access cannot be restored unless unlocked by The Watch Super Admin.`,
+      ip: clientIp,
+    });
+    return;
+  }
+
   // Skip static/noise paths
   if (SKIP_PATHS.some((p) => req.path.startsWith(p))) {
     return next();

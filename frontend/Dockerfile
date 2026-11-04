@@ -1,5 +1,5 @@
-# Build Stage
-FROM node:20-alpine AS builder
+# Build Stage (Latest Node.js 22 LTS Security-Patched Alpine Image)
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 

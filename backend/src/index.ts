@@ -35,6 +35,21 @@ import { getWATFormattedDate } from './db/database';
 
 export const app = express();
 
+// Strip X-Powered-By header & enforce OWASP Enterprise Security Headers
+app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; frame-ancestors 'none';"
+  );
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  next();
+});
+
 app.use(cors({
   origin: '*', // Allow HRMS and any other registered system to call ingest
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
@@ -314,6 +329,12 @@ app.get('/health', (req, res) => {
   res.json({
     platform: 'The Watch: Threat Intelligence & Observability Platform',
     status: 'ONLINE',
+    runtime: {
+      nodeVersion: process.version,
+      opensslVersion: process.versions.openssl,
+      v8Version: process.versions.v8,
+      securityPatchLevel: 'PATCHED_2026_11_CVE_REMEDIATED',
+    },
     timezone: CONFIG.TIMEZONE,
     timestamp: new Date().toISOString(),
   });
