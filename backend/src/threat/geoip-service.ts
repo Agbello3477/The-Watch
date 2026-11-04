@@ -27,6 +27,21 @@ export interface GeoIPProfile {
  */
 const KNOWN_IP_PROFILES: Record<string, Partial<GeoIPProfile>> = {
   // Nigerian Institutional & ISP Networks
+  '154.68.225.146': {
+    country: 'Nigeria',
+    countryCode: 'NG',
+    region: 'Abuja (FCT)',
+    city: 'Abuja',
+    postalCode: '900001',
+    latitude: 9.0765,
+    longitude: 7.3986,
+    asn: 'AS37148',
+    isp: 'Nigerian Broadband / Telecom Gateway',
+    organization: 'NOUN SOC Operator Gateway',
+    isProxyOrVpn: false,
+    isTorExitNode: false,
+    threatRiskScore: 5,
+  },
   '197.210.64.12': {
     country: 'Nigeria',
     countryCode: 'NG',
@@ -79,7 +94,7 @@ const KNOWN_IP_PROFILES: Record<string, Partial<GeoIPProfile>> = {
     city: 'Ibadan',
     postalCode: '200001',
     latitude: 7.3775,
-    longitude: 3.9470,
+    longitude: 3.947,
     asn: 'AS37284',
     isp: 'Spectranet Limited',
     organization: 'Spectranet LTE Gateway',
@@ -167,13 +182,15 @@ const KNOWN_IP_PROFILES: Record<string, Partial<GeoIPProfile>> = {
 };
 
 export class GeoIPService {
+  private liveCache: Map<string, GeoIPProfile> = new Map();
+
   /**
    * Resolves IP intelligence, geolocation, ASN, and Proxy/Tor indicators
    */
   public async resolve(ip: string): Promise<GeoIPProfile> {
     const cleanIp = (ip || '').replace(/^::ffff:/, '').trim();
 
-    // Check for exact profile match
+    // 1. Check for exact known profile match
     if (KNOWN_IP_PROFILES[cleanIp]) {
       const match = KNOWN_IP_PROFILES[cleanIp];
       const reverseDns = await this.resolveReverseDns(cleanIp);
@@ -196,7 +213,7 @@ export class GeoIPService {
       };
     }
 
-    // Local / Private / Loopback IPs
+    // 2. Local / Private / Loopback IPs
     if (this.isPrivateOrLocal(cleanIp)) {
       return {
         ip: cleanIp,
@@ -217,7 +234,45 @@ export class GeoIPService {
       };
     }
 
-    // Dynamic heuristic geolocation based on IP octets
+    // 3. Check in-memory live lookup cache
+    const cached = this.liveCache.get(cleanIp);
+    if (cached) {
+      return cached;
+    }
+
+    // 4. Perform real-time GeoIP lookup against ipwho.is / ip-api.com
+    const liveProfile = await this.lookupRealGeoIp(cleanIp);
+    if (liveProfile) {
+      this.liveCache.set(cleanIp, liveProfile);
+      return liveProfile;
+    }
+
+    // 5. Fallback for AFRINIC / Nigerian ISP blocks (41.*, 102.*, 105.*, 154.*, 197.*)
+    const firstOctet = Number(cleanIp.split('.')[0] || 0);
+    const reverseDns = await this.resolveReverseDns(cleanIp);
+    if ([41, 102, 105, 154, 197].includes(firstOctet)) {
+      const ngFallback: GeoIPProfile = {
+        ip: cleanIp,
+        reverseDns: reverseDns || `${cleanIp}.in-addr.arpa`,
+        country: 'Nigeria',
+        countryCode: 'NG',
+        region: 'Abuja (FCT)',
+        city: 'Abuja',
+        postalCode: '900001',
+        latitude: 9.0765,
+        longitude: 7.3986,
+        asn: 'AS37075',
+        isp: 'Nigerian Telecom / AFRINIC Block',
+        organization: 'Nigerian Broadband Network',
+        isProxyOrVpn: false,
+        isTorExitNode: false,
+        threatRiskScore: 10,
+      };
+      this.liveCache.set(cleanIp, ngFallback);
+      return ngFallback;
+    }
+
+    // 6. General fallback
     const octets = cleanIp.split('.').map(Number);
     const hash = (octets[0] || 0) * 7 + (octets[1] || 0) * 13 + (octets[2] || 0) * 19 + (octets[3] || 0);
 
@@ -285,7 +340,6 @@ export class GeoIPService {
     ];
 
     const cluster = geoClusters[Math.abs(hash) % geoClusters.length];
-    const reverseDns = await this.resolveReverseDns(cleanIp);
     const isTor = cleanIp.startsWith('185.220.') || cleanIp.startsWith('198.98.');
     const isProxy = isTor || cleanIp.startsWith('45.154.') || cleanIp.startsWith('194.26.');
 
@@ -306,6 +360,45 @@ export class GeoIPService {
       isTorExitNode: isTor,
       threatRiskScore: isTor ? 95 : isProxy ? 85 : 25,
     };
+  }
+
+  private async lookupRealGeoIp(ip: string): Promise<GeoIPProfile | null> {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2200);
+      const res = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data: any = await res.json();
+        if (data && data.success !== false && data.country) {
+          const reverseDns = await this.resolveReverseDns(ip);
+          const asnNum = data.connection?.asn ? `AS${data.connection.asn}` : 'AS37075';
+          const ispName = data.connection?.isp || data.connection?.org || 'Regional Telecom Provider';
+          return {
+            ip,
+            reverseDns: data.connection?.domain || reverseDns || `${ip}.in-addr.arpa`,
+            country: data.country,
+            countryCode: data.country_code || 'NG',
+            region: data.region || 'Unknown',
+            city: data.city || 'Unknown',
+            postalCode: data.postal || 'N/A',
+            latitude: Number(data.latitude) || 0,
+            longitude: Number(data.longitude) || 0,
+            asn: asnNum,
+            isp: ispName,
+            organization: data.connection?.org || ispName,
+            isProxyOrVpn: false,
+            isTorExitNode: false,
+            threatRiskScore: 15,
+          };
+        }
+      }
+    } catch {
+      // Ignore network timeout and proceed to fallback
+    }
+    return null;
   }
 
   private isPrivateOrLocal(ip: string): boolean {
