@@ -31,7 +31,13 @@ import { Globe, Activity, Sparkles, FileText, Flame, Users, ShieldCheck, ShieldA
 
 export const App: React.FC = () => {
   const [selectedSystem, setSelectedSystem] = useState<string>('');
-  const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'users'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'dashboard' | 'users'>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('soc_alarm') === '1') return 'dashboard';
+    } catch {}
+    return 'home';
+  });
   const [activeSocTab, setActiveSocTab] = useState<'soc' | 'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'traffic' | 'scanner' | 'zeek' | 'connect'>('soc');
   
   // Auth state
@@ -260,85 +266,45 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleViewThreatInWarRoom = (alert: LiveThreatAlert) => {
+  const handleViewThreatInWarRoom = useCallback((_alert: LiveThreatAlert) => {
     setCurrentView('dashboard');
     setActiveSocTab('soc');
+    try {
+      window.focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {}
     fetchData();
-  };
+  }, [fetchData]);
 
-  // If on landing home page:
-  if (currentView === 'home') {
-    return (
-      <>
-        {/* Real-time Threat Alert Floating HUD Prompt */}
-        <RealtimeThreatAlertPrompt
-          onViewWarRoom={handleViewThreatInWarRoom}
-          onAlertNeutralized={() => fetchData()}
-        />
-
+  return (
+    <>
+      {currentView === 'home' ? (
         <LandingHome
           currentUser={currentUser}
           onOpenLogin={() => setIsLoginModalOpen(true)}
           onEnterDashboard={() => setCurrentView('dashboard')}
           onOpenUserManagement={() => setCurrentView('users')}
         />
-        <LoginModal
-          isOpen={isLoginModalOpen}
-          onClose={() => setIsLoginModalOpen(false)}
-          onLoginSuccess={handleLoginSuccess}
-        />
-
-        {/* 3-Minute Session Inactivity Timeout Notification Modal */}
-        {sessionTimeoutNotice && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
-            <div className="relative w-full max-w-sm bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl text-center space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center mx-auto text-yellow-400">
-                <ShieldAlert className="w-6 h-6 animate-pulse" />
-              </div>
-
-              <div>
-                <h3 className="text-base font-bold text-slate-100">Session Timed Out</h3>
-                <p className="text-xs text-slate-400 mt-1 font-mono">
-                  For security compliance, your active session was terminated following 3 minutes of inactivity.
-                </p>
-              </div>
-
-              <button
-                onClick={() => {
-                  setSessionTimeoutNotice(false);
-                  setIsLoginModalOpen(true);
-                }}
-                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white border border-blue-500/40 font-bold text-xs transition shadow-sm cursor-pointer"
-              >
-                Sign In Again
-              </button>
-            </div>
-          </div>
-        )}
-      </>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-black">
-      
-      {/* 1. Header Bar with Auth, Navigation & WAT Clock */}
-      <Header
-        overview={overview}
-        selectedSystem={selectedSystem}
-        onSelectSystem={setSelectedSystem}
-        onRefresh={fetchData}
-        isRefreshing={isRefreshing}
-        autoRefreshInterval={autoRefreshInterval}
-        setAutoRefreshInterval={setAutoRefreshInterval}
-        currentUser={currentUser}
-        activeTab={currentView === 'users' ? 'users' : 'overview'}
-        onTabChange={handleTabChangeFromHeader}
-        onOpenLogin={() => setIsLoginModalOpen(true)}
-        onLogout={handleLogout}
-        onGoHome={() => setCurrentView('home')}
-        sessionTimeRemaining={sessionTimeRemaining}
-      />
+      ) : (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-black">
+          
+          {/* 1. Header Bar with Auth, Navigation & WAT Clock */}
+          <Header
+            overview={overview}
+            selectedSystem={selectedSystem}
+            onSelectSystem={setSelectedSystem}
+            onRefresh={fetchData}
+            isRefreshing={isRefreshing}
+            autoRefreshInterval={autoRefreshInterval}
+            setAutoRefreshInterval={setAutoRefreshInterval}
+            currentUser={currentUser}
+            activeTab={currentView === 'users' ? 'users' : 'overview'}
+            onTabChange={handleTabChangeFromHeader}
+            onOpenLogin={() => setIsLoginModalOpen(true)}
+            onLogout={handleLogout}
+            onGoHome={() => setCurrentView('home')}
+            sessionTimeRemaining={sessionTimeRemaining}
+          />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -587,10 +553,13 @@ export const App: React.FC = () => {
           </div>
         </div>
       </footer>
+        </div>
+      )}
 
-      {/* Real-time Threat Alert Floating HUD Prompt */}
+      {/* Real-time Threat Alert Floating HUD Prompt (Mounted persistently across all screens & tabs) */}
       <RealtimeThreatAlertPrompt
         onViewWarRoom={handleViewThreatInWarRoom}
+        onAlarmTriggered={handleViewThreatInWarRoom}
         onAlertNeutralized={() => fetchData()}
       />
 
@@ -604,14 +573,14 @@ export const App: React.FC = () => {
       {/* 3-Minute Session Inactivity Timeout Notification Modal */}
       {sessionTimeoutNotice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
-          <div className="relative w-full max-w-sm bg-slate-900 border border-amber-500/50 rounded-2xl p-6 shadow-2xl shadow-amber-950/60 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+          <div className="relative w-full max-w-sm bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center mx-auto text-yellow-400">
               <ShieldAlert className="w-6 h-6 animate-pulse" />
             </div>
 
             <div>
-              <h3 className="text-base font-bold text-white">Session Timed Out</h3>
-              <p className="text-xs text-slate-300 mt-1 font-mono">
+              <h3 className="text-base font-bold text-slate-100">Session Timed Out</h3>
+              <p className="text-xs text-slate-400 mt-1 font-mono">
                 For security compliance, your active session was terminated following 3 minutes of inactivity.
               </p>
             </div>
@@ -621,15 +590,14 @@ export const App: React.FC = () => {
                 setSessionTimeoutNotice(false);
                 setIsLoginModalOpen(true);
               }}
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs transition shadow-lg shadow-cyan-500/25 cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white border border-blue-500/40 font-bold text-xs transition shadow-sm cursor-pointer"
             >
               Sign In Again
             </button>
           </div>
         </div>
       )}
-
-    </div>
+    </>
   );
 };
 

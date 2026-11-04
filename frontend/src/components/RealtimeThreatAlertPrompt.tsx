@@ -99,6 +99,7 @@ interface IpTraceResult {
 
 interface RealtimeThreatAlertPromptProps {
   onViewWarRoom?: (alert: LiveThreatAlert) => void;
+  onAlarmTriggered?: (alert: LiveThreatAlert) => void;
   onAlertNeutralized?: (alertId: string) => void;
 }
 
@@ -252,18 +253,63 @@ function stopVoiceAlert() {
   } catch {}
 }
 
+// Emergency flashing favicon data URI (Red Siren Beacon)
+const EMERGENCY_SIREN_FAVICON =
+  "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='%23ef4444'/><text y='.88em' x='12' font-size='75'>🚨</text></svg>";
+const DEFAULT_WATCH_TITLE =
+  'The Watch | Observability & Threat Intelligence (Powered by MaSha Tech Innovations)';
+
 /**
- * Triggers OS-level Desktop & Lock-Screen Notification with Vibration
+ * Triggers OS-level Desktop & Lock-Screen Notification with Vibration + Auto-Focus & Auto-Navigation
+ * back to The Watch screen/tab.
  */
-function triggerOsSleepNotification(alert: LiveThreatAlert) {
+function triggerOsSleepNotification(
+  alert: LiveThreatAlert,
+  onAutoNavigate?: (alert: LiveThreatAlert) => void
+) {
   try {
+    // 1. Attempt immediate browser window/tab focus
+    try {
+      window.focus();
+      if (window.top && window.top !== window) window.top.focus();
+      if (window.parent && window.parent !== window) window.parent.focus();
+    } catch {}
+
+    // 2. Ask Service Worker (/sw-alarm.js) to focus the tab via WindowClient.focus() & show persistent action notification
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then((reg) => {
+          if (reg.active) {
+            reg.active.postMessage({
+              type: 'TRIGGER_EMERGENCY_ALARM',
+              alert,
+            });
+          }
+        })
+        .catch(() => {});
+    }
+
+    // 3. Native Notification with click-to-focus & auto-navigate handler
     if ('Notification' in window) {
       if (Notification.permission === 'granted') {
-        new Notification(`🚨 INTRUSION ALERT [${alert.systemId}]: ${alert.threatClassification}`, {
-          body: `Attacker IP: ${alert.offendingIp} (${alert.geoCity || 'Unknown'}, ${alert.geoCountry || 'Unknown'}) at ${alert.timestampWat}. Rerouted to ${EMERGENCY_PHONE} & ${EMERGENCY_EMAIL}.`,
-          requireInteraction: true,
-          tag: alert.id,
-        });
+        const notif = new Notification(
+          `🚨 INTRUSION ALERT [${alert.systemId}]: ${alert.threatClassification}`,
+          {
+            body: `Attacker IP: ${alert.offendingIp} (${alert.geoCity || 'Unknown'}, ${alert.geoCountry || 'Unknown'}) at ${alert.timestampWat}. Click to jump to The Watch SOC immediately.`,
+            icon: '/logo.jpg',
+            requireInteraction: true,
+            tag: alert.id,
+          }
+        );
+        notif.onclick = (e) => {
+          try {
+            e.preventDefault();
+            window.focus();
+            if (window.top && window.top !== window) window.top.focus();
+            onAutoNavigate?.(alert);
+            notif.close();
+          } catch {}
+        };
       } else if (Notification.permission !== 'denied') {
         Notification.requestPermission();
       }
@@ -276,6 +322,7 @@ function triggerOsSleepNotification(alert: LiveThreatAlert) {
 
 export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps> = ({
   onViewWarRoom,
+  onAlarmTriggered,
   onAlertNeutralized,
 }) => {
   const [alerts, setAlerts] = useState<LiveThreatAlert[]>([]);
@@ -304,6 +351,108 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
   const sirenLoopRef = useRef<any>(null);
   const voiceLoopRef = useRef<any>(null);
   const wakeLockSentinelRef = useRef<any>(null);
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
+
+  const onAlarmTriggeredRef = useRef(onAlarmTriggered);
+  const onViewWarRoomRef = useRef(onViewWarRoom);
+  useEffect(() => {
+    onAlarmTriggeredRef.current = onAlarmTriggered;
+    onViewWarRoomRef.current = onViewWarRoom;
+  }, [onAlarmTriggered, onViewWarRoom]);
+
+  const navigateToWatchScreen = useCallback((alert: LiveThreatAlert) => {
+    try {
+      window.focus();
+      if (window.top && window.top !== window) window.top.focus();
+    } catch {}
+    if (onAlarmTriggeredRef.current) {
+      onAlarmTriggeredRef.current(alert);
+    } else if (onViewWarRoomRef.current) {
+      onViewWarRoomRef.current(alert);
+    }
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {}
+  }, []);
+
+  // Register Service Worker (/sw-alarm.js) & Cross-Tab BroadcastChannel for automatic tab/screen focus
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw-alarm.js').catch(() => {});
+
+      const handleSwMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'NAVIGATE_TO_WATCH_SOC') {
+          try {
+            window.focus();
+          } catch {}
+          if (event.data.alert) {
+            navigateToWatchScreen(event.data.alert);
+          } else if (alerts[0]) {
+            navigateToWatchScreen(alerts[0]);
+          }
+        }
+      };
+
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      };
+    }
+  }, [navigateToWatchScreen, alerts]);
+
+  useEffect(() => {
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const channel = new BroadcastChannel('the_watch_soc_alarm_channel');
+        broadcastChannelRef.current = channel;
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'INTRUSION_ALARM_NAVIGATE' && event.data.alert) {
+            navigateToWatchScreen(event.data.alert);
+          }
+        };
+        return () => {
+          channel.close();
+          broadcastChannelRef.current = null;
+        };
+      } catch {}
+    }
+  }, [navigateToWatchScreen]);
+
+  // Flash browser tab title & red siren favicon whenever an alarm is active so user immediately sees it across tabs
+  useEffect(() => {
+    const faviconEl = document.querySelector("link[rel*='icon']") as HTMLLinkElement | null;
+    const originalFavicon = '/favicon.jpg';
+
+    if (alerts.length === 0) {
+      document.title = DEFAULT_WATCH_TITLE;
+      if (faviconEl) faviconEl.href = originalFavicon;
+      return;
+    }
+
+    const activeAlert = alerts[0];
+    let toggle = false;
+    const titleInterval = setInterval(() => {
+      toggle = !toggle;
+      document.title = toggle
+        ? `🚨 [ALARM!] RETURN TO THE WATCH SOC (${activeAlert.systemId})`
+        : `⚠️ ${activeAlert.threatClassification} — IP ${activeAlert.offendingIp}`;
+      if (faviconEl) {
+        faviconEl.href = toggle ? EMERGENCY_SIREN_FAVICON : originalFavicon;
+      }
+      // If user is on another tab/window while siren is ringing, continuously request focus
+      if (document.hidden) {
+        try {
+          window.focus();
+        } catch {}
+      }
+    }, 600);
+
+    return () => {
+      clearInterval(titleInterval);
+      document.title = DEFAULT_WATCH_TITLE;
+      if (faviconEl) faviconEl.href = originalFavicon;
+    };
+  }, [alerts]);
 
   // 1. Hardware Screen & Sleep Wake-Lock + Sleep/Shutdown Failover Listeners
   useEffect(() => {
@@ -401,11 +550,16 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
     if (isSirenRinging && !isMuted && alerts.length > 0) {
       playWakeUpKlaxonCycle();
       speakIntrusionVoiceAlert(alerts[0]);
-      triggerOsSleepNotification(alerts[0]);
+      triggerOsSleepNotification(alerts[0], navigateToWatchScreen);
 
       // Repeat piercing klaxon every 1.45 seconds continuously so the user wakes up even from sleep!
       sirenLoopRef.current = setInterval(() => {
         playWakeUpKlaxonCycle();
+        if (document.hidden) {
+          try {
+            window.focus();
+          } catch {}
+        }
       }, 1450);
 
       // Repeat spoken voice warning every 14 seconds
@@ -422,7 +576,7 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
       if (sirenLoopRef.current) clearInterval(sirenLoopRef.current);
       if (voiceLoopRef.current) clearInterval(voiceLoopRef.current);
     };
-  }, [isSirenRinging, isMuted, alerts]);
+  }, [isSirenRinging, isMuted, alerts, navigateToWatchScreen]);
 
   const handleSilenceSiren = () => {
     setIsSirenRinging(false);
@@ -526,6 +680,16 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
     setAlerts((prev) => [demoAlert, ...prev.slice(0, 2)]);
     setIsSirenRinging(true);
 
+    // Automatically navigate back to The Watch SOC screen/tab immediately
+    navigateToWatchScreen(demoAlert);
+    triggerOsSleepNotification(demoAlert, navigateToWatchScreen);
+    try {
+      broadcastChannelRef.current?.postMessage({
+        type: 'INTRUSION_ALARM_NAVIGATE',
+        alert: demoAlert,
+      });
+    } catch {}
+
     // Also dispatch failover notification to phone & email
     api
       .rerouteAlertToMobileAndEmail({
@@ -549,16 +713,32 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
       .catch(() => {});
   };
 
-  const pushAlert = useCallback((alert: LiveThreatAlert) => {
-    if (seenIdsRef.current.has(alert.id)) return;
-    seenIdsRef.current.add(alert.id);
+  const pushAlert = useCallback(
+    (alert: LiveThreatAlert, fromBroadcast = false) => {
+      if (seenIdsRef.current.has(alert.id)) return;
+      seenIdsRef.current.add(alert.id);
 
-    setAlerts((prev) => {
-      const updated = [alert, ...prev.filter((a) => a.id !== alert.id)];
-      return updated.slice(0, 3);
-    });
-    setIsSirenRinging(true);
-  }, []);
+      setAlerts((prev) => {
+        const updated = [alert, ...prev.filter((a) => a.id !== alert.id)];
+        return updated.slice(0, 3);
+      });
+      setIsSirenRinging(true);
+
+      // Automatically navigate the user back to The Watch SOC screen/tab even if they are on another screen or tab
+      navigateToWatchScreen(alert);
+      triggerOsSleepNotification(alert, navigateToWatchScreen);
+
+      if (!fromBroadcast) {
+        try {
+          broadcastChannelRef.current?.postMessage({
+            type: 'INTRUSION_ALARM_NAVIGATE',
+            alert,
+          });
+        } catch {}
+      }
+    },
+    [navigateToWatchScreen]
+  );
 
   // SSE Stream with Fallback Fast Polling
   useEffect(() => {
