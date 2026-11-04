@@ -740,7 +740,13 @@ export class SocEngine {
     if (filters?.tier) list = list.filter((c) => c.tier === filters.tier);
     if (filters?.status) list = list.filter((c) => c.status === filters.status);
     if (filters?.systemId) list = list.filter((c) => c.systemId === filters.systemId);
-    return list.sort((a, b) => (a.severity === 'P1' ? -1 : 1));
+
+    const sevWeight: Record<string, number> = { P1: 1, P2: 2, P3: 3, P4: 4 };
+    return list.sort((a, b) => {
+      const diff = (sevWeight[a.severity] || 99) - (sevWeight[b.severity] || 99);
+      if (diff !== 0) return diff;
+      return a.id.localeCompare(b.id);
+    });
   }
 
   public getCaseById(id: string): SocCase | undefined {

@@ -39,9 +39,20 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
   // UI State
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedCase, setSelectedCase] = useState<SocCase | null>(null);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [selectedCaseFallback, setSelectedCaseFallback] = useState<SocCase | null>(null);
   const [caseFilterSeverity, setCaseFilterSeverity] = useState<string>('ALL');
   const [caseFilterStatus, setCaseFilterStatus] = useState<string>('ALL');
+
+  const selectedCase = React.useMemo(() => {
+    if (!selectedCaseId) return null;
+    return cases.find((c) => c.id === selectedCaseId) || selectedCaseFallback;
+  }, [cases, selectedCaseId, selectedCaseFallback]);
+
+  const handleSelectCase = (socCase: SocCase) => {
+    setSelectedCaseId(socCase.id);
+    setSelectedCaseFallback(socCase);
+  };
 
   // Modals & Action States
   const [isBanModalOpen, setIsBanModalOpen] = useState(false);
@@ -76,25 +87,20 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
       ]);
 
       setMetrics(metricsData);
-      setCases(casesData.cases || []);
+      const incomingCases = casesData.cases || [];
+      setCases(incomingCases);
       setBlocklist(blocklistData.blocklist || []);
       setIocs(iocsData.iocs || []);
       setPlaybooks(playbooksData.playbooks || []);
       setRules(rulesData.rules || []);
       setShifts(shiftsData.handovers || []);
-
-      // If active case is open, update its reference
-      if (selectedCase) {
-        const refreshedCase = casesData.cases?.find((c) => c.id === selectedCase.id);
-        if (refreshedCase) setSelectedCase(refreshedCase);
-      }
     } catch (err) {
       console.error('[SOC] Error fetching SOC operational data:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedSystem, selectedCase]);
+  }, [selectedSystem]);
 
   useEffect(() => {
     fetchSocData();
@@ -400,16 +406,16 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
 
             <div className="space-y-3">
               {filteredCases.map((socCase) => {
-                const isSelected = selectedCase?.id === socCase.id;
+                const isSelected = selectedCaseId === socCase.id;
                 const isP1 = socCase.severity === 'P1';
                 return (
                   <div
                     key={socCase.id}
-                    onClick={() => setSelectedCase(socCase)}
+                    onClick={() => handleSelectCase(socCase)}
                     className={`p-4 rounded-xl border transition cursor-pointer ${
                       isSelected
-                        ? 'bg-slate-800/90 border-cyan-500 shadow-xl shadow-cyan-500/10 ring-1 ring-cyan-500'
-                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
+                        ? 'bg-slate-800 border-blue-500 shadow-lg ring-1 ring-blue-500'
+                        : 'bg-slate-900 border-slate-700 hover:border-slate-600 hover:bg-slate-800/50'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -460,19 +466,27 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
           </div>
 
           {/* Right Column: Case War Room Details */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 space-y-5">
             {selectedCase ? (
               <>
-                <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-start justify-between pb-3 border-b border-slate-700">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-cyan-400 font-bold">{selectedCase.id}</span>
-                      <span className="text-[10px] font-mono bg-red-950 text-red-400 border border-red-800 px-2 py-0.5 rounded">
-                        {selectedCase.severity}
-                      </span>
+                      <span className="text-xs font-mono text-blue-400 font-bold">{selectedCase.id}</span>
+                      <SocSeverityBadge severity={selectedCase.severity} />
                     </div>
                     <h3 className="text-base font-bold text-slate-100 mt-1">{selectedCase.title}</h3>
                   </div>
+                  <button
+                    onClick={() => {
+                      setSelectedCaseId(null);
+                      setSelectedCaseFallback(null);
+                    }}
+                    title="Deselect Case"
+                    className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 border border-slate-700 text-[10px] font-mono transition"
+                  >
+                    Clear Selection
+                  </button>
                 </div>
 
                 {/* MITRE ATT&CK Mapping */}
