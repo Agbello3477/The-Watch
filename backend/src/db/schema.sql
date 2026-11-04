@@ -148,7 +148,24 @@ CREATE TABLE IF NOT EXISTS audit_reports (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS soc_ip_blocklist (
+    id VARCHAR(64) PRIMARY KEY,
+    ip VARCHAR(64) UNIQUE NOT NULL,
+    reason TEXT NOT NULL,
+    threat_classification VARCHAR(255) NOT NULL,
+    system_id VARCHAR(64) NOT NULL DEFAULT 'NOUN-HRMS & THE-WATCH-SOC',
+    blocked_by VARCHAR(255) NOT NULL,
+    blocked_at_wat VARCHAR(64) NOT NULL,
+    expires_at_wat VARCHAR(128) NOT NULL DEFAULT 'PERMANENT (Until Unlocked by Super Admin)',
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, REVOKED
+    request_count_blocked INTEGER DEFAULT 0,
+    unlocked_by VARCHAR(255),
+    unlocked_at_wat VARCHAR(64),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indices for rapid query observability, users, and incident filtering
+CREATE INDEX IF NOT EXISTS idx_soc_blocklist_ip_status ON soc_ip_blocklist (ip, status);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
 CREATE INDEX IF NOT EXISTS idx_user_audit_time ON user_audit_logs (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_telemetry_system_time ON telemetry_logs (system_id, created_at DESC);

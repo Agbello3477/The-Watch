@@ -4,6 +4,7 @@ import { CONFIG } from '../config';
 import { geoIPService } from '../threat/geoip-service';
 import { ddosDetector } from '../threat/ddos-detector';
 import { realtimeAlertHub } from '../alerts/realtime-alert-hub';
+import { socEngine } from '../soc/soc-engine';
 
 export interface AuthSessionUser {
   id: string;
@@ -21,7 +22,7 @@ export interface LoginResult {
   token?: string;
   user?: AuthSessionUser;
   error?: string;
-  code?: 'INVALID_CREDENTIALS' | 'ACCOUNT_LOCKED' | 'ACCOUNT_SUSPENDED' | 'RATE_LIMITED';
+  code?: 'INVALID_CREDENTIALS' | 'ACCOUNT_LOCKED' | 'ACCOUNT_SUSPENDED' | 'RATE_LIMITED' | 'IP_QUARANTINED';
   lockedUntil?: string;
 }
 
@@ -66,6 +67,36 @@ export class AuthService {
 
     // 2. Fetch user
     const user = await db.getUserByEmail(cleanEmail);
+
+    // 2b. Enforce Permanent SOC IP Blocklist:
+    // Any IP that is blocked cannot log in or access The Watch or NOUN-HRMS unless authenticating as SUPER_ADMIN
+    if (socEngine.isIpBlocked(ipAddress) && (!user || user.role !== 'SUPER_ADMIN')) {
+      socEngine.recordBlockedRequest(ipAddress);
+      const blockedAuditLog: UserAuditLog = {
+        id: `ual-ipblk-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        user_id: user?.id,
+        email: cleanEmail,
+        full_name: user?.full_name || 'Quarantined Client',
+        role: user?.role || 'BLOCKED_IP',
+        action: 'LOGIN_FAILED',
+        ip_address: ipAddress,
+        location: locationStr,
+        geo_city: geo.city,
+        geo_country: geo.country,
+        user_agent: userAgent,
+        status: 'BLOCKED',
+        details: `Blocked IP (${ipAddress}) denied authentication across The Watch and NOUN-HRMS — Super Admin unlock required`,
+        created_at_wat: getWATFormattedDate(),
+      };
+      await db.saveUserAuditLog(blockedAuditLog);
+      realtimeAlertHub.broadcastAuditLog(blockedAuditLog);
+
+      return {
+        success: false,
+        error: `ACCESS PERMANENTLY DENIED: Your IP address (${ipAddress}) is blocked across both The Watch and NOUN-HRMS. Only The Watch Super Admin can unlock this IP address.`,
+        code: 'IP_QUARANTINED',
+      };
+    }
 
     if (!user) {
       // Record failed attempt audit log
@@ -258,6 +289,25 @@ export class AuthService {
         path: '/api/v1/auth/login',
         statusCode: 401,
       });
+
+      if (socEngine.isIpBlocked(ipAddress)) {
+        socEngine.recordBlockedRequest(ipAddress);
+        return {
+          success: false,
+          error: `ACCESS PERMANENTLY DENIED: Your IP address (${ipAddress}) is blocked across both The Watch and NOUN-HRMS. Only The Watch Super Admin can unlock this IP address.`,
+          code: 'IP_QUARANTINED',
+        };
+      }
+
+      if (lockUntil && user.role !== 'SUPER_ADMIN') {
+        socEngine.blockIp({
+          ip: ipAddress,
+          reason: `Brute-Force Intrusion Lockout on ${user.email} (${this.MAX_FAILED_ATTEMPTS} failed attempts)`,
+          threatClassification: 'Brute-Force Credential Stuffing Lockout',
+          systemId: 'NOUN-HRMS & THE-WATCH-SOC',
+          blockedBy: 'The Watch Active Brute-Force Guard',
+        });
+      }
 
       if (lockUntil) {
         return {

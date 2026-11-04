@@ -33,13 +33,15 @@ authRouter.post('/login', async (req: Request, res: Response) => {
   });
 
   if (!result.success) {
-    const statusCode = result.code === 'ACCOUNT_LOCKED' ? 423 : result.code === 'ACCOUNT_SUSPENDED' ? 403 : 401;
+    const statusCode =
+      result.code === 'ACCOUNT_LOCKED'
+        ? 423
+        : result.code === 'ACCOUNT_SUSPENDED' || result.code === 'IP_QUARANTINED'
+        ? 403
+        : 401;
     res.status(statusCode).json(result);
     return;
   }
-
-  // Whitelist & unban authenticated SOC Operator IP so resolving self-tested alerts never locks out the operator
-  socEngine.whitelistOperatorIp(ipAddress);
 
   res.json(result);
 });
@@ -49,7 +51,18 @@ authRouter.post('/login', async (req: Request, res: Response) => {
  */
 authRouter.get('/me', authenticateUser, (req: AuthenticatedUserRequest, res: Response) => {
   const ipAddress = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '127.0.0.1').split(',')[0].trim();
-  socEngine.whitelistOperatorIp(ipAddress);
+  if (socEngine.isIpBlocked(ipAddress) && req.user?.role !== 'SUPER_ADMIN') {
+    socEngine.recordBlockedRequest(ipAddress);
+    res.status(403).json({
+      error: 'IP_QUARANTINED_BY_THE_WATCH_SOC',
+      code: 'IP_QUARANTINED',
+      message: `ACCESS PERMANENTLY DENIED: Your IP address (${ipAddress}) is blocked across both The Watch and NOUN-HRMS. Only The Watch Super Admin can unlock this IP address.`,
+      ip: ipAddress,
+      sessionValid: false,
+      timestampWat: getWATFormattedDate(),
+    });
+    return;
+  }
   res.json({
     user: req.user,
     sessionValid: true,

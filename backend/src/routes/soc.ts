@@ -1,5 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { socEngine } from '../soc/soc-engine';
+import { authenticateUser, requireSuperAdmin, AuthenticatedUserRequest } from '../middleware/user-auth';
+import { db, getWATFormattedDate } from '../db/database';
+import { authService } from '../auth/auth-service';
 
 export const socRouter = Router();
 
@@ -73,47 +76,116 @@ socRouter.patch('/cases/:id/assign', (req: Request, res: Response) => {
   res.json(updated);
 });
 
-// ─── 3. Dynamic IP Blocklist & Ingest Firewall ─────────────────
+// ─── 3. Dynamic IP Blocklist & Permanent Cross-System Firewall ─
 socRouter.get('/blocklist', (_req: Request, res: Response) => {
   const blocklist = socEngine.getBlocklist();
-  res.json({ blocklist, total: blocklist.length });
+  res.json({
+    blocklist,
+    activeIps: socEngine.getActiveBlockedIps(),
+    total: blocklist.length,
+    enforcedSystems: ['THE-WATCH-SOC', 'NOUN-HRMS'],
+    unlockPolicy: 'SUPER_ADMIN_ONLY',
+  });
+});
+
+/**
+ * Fast real-time blocklist sync endpoint for NOUN-HRMS Sentinel Agent & connected systems
+ */
+socRouter.get('/blocklist/active-ips', (_req: Request, res: Response) => {
+  const activeIps = socEngine.getActiveBlockedIps();
+  res.json({
+    activeIps,
+    count: activeIps.length,
+    enforcedSystems: ['THE-WATCH-SOC', 'NOUN-HRMS'],
+    unlockPolicy: 'SUPER_ADMIN_ONLY',
+    timestampWat: getWATFormattedDate(),
+  });
+});
+
+/**
+ * Fast real-time IP check endpoint for NOUN-HRMS Sentinel Agent & edge gateways
+ */
+socRouter.get('/blocklist/check/:ip', (req: Request, res: Response) => {
+  const ip = decodeURIComponent(req.params.ip || '').trim();
+  const blocked = socEngine.isIpBlocked(ip);
+  const entry = socEngine.getBlockEntry(ip);
+  res.json({
+    ip,
+    blocked,
+    enforcedSystems: ['THE-WATCH-SOC', 'NOUN-HRMS'],
+    unlockPolicy: 'SUPER_ADMIN_ONLY',
+    reason: blocked ? entry?.reason : undefined,
+    threatClassification: blocked ? entry?.threatClassification : undefined,
+    blockedAtWat: blocked ? entry?.blockedAtWat : undefined,
+    expiresAtWat: blocked ? entry?.expiresAtWat : undefined,
+  });
 });
 
 socRouter.post('/blocklist', (req: Request, res: Response) => {
-  const { ip, reason, threatClassification, systemId, blockedBy, durationHours } = req.body;
+  const { ip, reason, threatClassification, systemId, blockedBy } = req.body;
   if (!ip || !reason) {
     res.status(400).json({ error: 'IP and reason are required' });
     return;
   }
-  const operatorIp = ((req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1')
-    .split(',')[0]
-    .trim();
-  socEngine.whitelistOperatorIp(operatorIp);
+
+  let actorName = blockedBy || 'SOC Firewall Operator';
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const decoded = authService.verifyToken(authHeader.slice(7).trim());
+    if (decoded?.email) {
+      actorName = `${decoded.name || decoded.email} (${decoded.role})`;
+    }
+  }
 
   const entry = socEngine.blockIp({
     ip,
     reason,
     threatClassification,
-    systemId,
-    blockedBy,
-    durationHours: durationHours ? parseInt(durationHours, 10) : 24,
+    systemId: systemId || 'NOUN-HRMS & THE-WATCH-SOC',
+    blockedBy: actorName,
   });
   res.status(201).json(entry);
 });
 
-socRouter.delete('/blocklist/:ip', (req: Request, res: Response) => {
+const handleSuperAdminUnlock = async (req: AuthenticatedUserRequest, res: Response) => {
   const operatorIp = ((req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1')
     .split(',')[0]
     .trim();
-  socEngine.whitelistOperatorIp(operatorIp);
-  const targetIp = req.params.ip === 'SELF' ? operatorIp : req.params.ip;
-  const success = socEngine.unblockIp(targetIp);
+  const targetIp = decodeURIComponent(req.params.ip === 'SELF' ? operatorIp : req.params.ip).trim();
+  const superAdminLabel = `${req.user?.fullName || req.user?.email} (SUPER_ADMIN)`;
+
+  const success = socEngine.unblockIp(targetIp, superAdminLabel);
   if (!success) {
     res.status(404).json({ error: 'IP not found in blocklist' });
     return;
   }
-  res.json({ status: 'UNBLOCKED', ip: targetIp });
-});
+
+  await db.saveUserAuditLog({
+    id: `ual-unblock-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    system_id: 'THE-WATCH-SOC',
+    user_id: req.user?.id,
+    email: req.user?.email || 'abdulgaffarbello3477@gmail.com',
+    full_name: req.user?.fullName || 'Super Admin',
+    role: 'SUPER_ADMIN',
+    action: 'CLICK',
+    ip_address: operatorIp,
+    user_agent: req.headers['user-agent'],
+    status: 'SUCCESS',
+    details: `Super Admin unlocked quarantined IP ${targetIp} across The Watch and NOUN-HRMS`,
+    created_at_wat: getWATFormattedDate(),
+  });
+
+  res.json({
+    status: 'UNBLOCKED',
+    ip: targetIp,
+    unlockedBy: superAdminLabel,
+    unlockedAtWat: getWATFormattedDate(),
+    enforcedSystems: ['THE-WATCH-SOC', 'NOUN-HRMS'],
+  });
+};
+
+socRouter.delete('/blocklist/:ip', authenticateUser, requireSuperAdmin, handleSuperAdminUnlock);
+socRouter.post('/blocklist/:ip/unlock', authenticateUser, requireSuperAdmin, handleSuperAdminUnlock);
 
 // ─── 4. Threat Intelligence (IOCs) ────────────────────────────
 socRouter.get('/iocs', (_req: Request, res: Response) => {

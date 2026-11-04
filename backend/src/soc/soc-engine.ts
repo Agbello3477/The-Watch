@@ -1,4 +1,4 @@
-import { getWATFormattedDate } from '../db/database';
+import { db, getWATFormattedDate } from '../db/database';
 
 export interface IpBlocklistEntry {
   id: string;
@@ -11,6 +11,8 @@ export interface IpBlocklistEntry {
   expiresAtWat: string;
   status: 'ACTIVE' | 'REVOKED';
   requestCountBlocked: number;
+  unlockedBy?: string;
+  unlockedAtWat?: string;
 }
 
 export interface IocEntry {
@@ -127,38 +129,38 @@ export class SocEngine {
 
   // ===================== SEEDING SOC DEFAULTS =====================
   private seedDefaultSocData() {
-    // 1. Initial IP Blocklist
+    // 1. Initial IP Blocklist (Permanently Enforced Across Both The Watch & NOUN-HRMS Until Unlocked by Super Admin)
     const initialBans: Omit<IpBlocklistEntry, 'id'>[] = [
       {
         ip: '194.26.29.112',
-        reason: 'Automated SQL Injection Exploit Probe (sqlmap/1.7.2)',
+        reason: 'Automated SQL Injection Exploit Probe (sqlmap/1.7.2) — Permanent Lockout Across The Watch & NOUN-HRMS',
         threatClassification: 'SQLi UNION-Based Data Extraction',
-        systemId: 'NOUN-HRMS',
+        systemId: 'NOUN-HRMS & THE-WATCH-SOC',
         blockedBy: 'The Watch Heuristic WAF',
         blockedAtWat: getWATFormattedDate(new Date(Date.now() - 3600000)),
-        expiresAtWat: getWATFormattedDate(new Date(Date.now() + 82800000)),
+        expiresAtWat: 'PERMANENT (Until Unlocked by Super Admin)',
         status: 'ACTIVE',
         requestCountBlocked: 142,
       },
       {
         ip: '185.220.101.5',
-        reason: 'Tor Exit Node Credential Stuffing & Cookie Theft Attack',
+        reason: 'Tor Exit Node Credential Stuffing & Cookie Theft Attack — Permanent Lockout Across The Watch & NOUN-HRMS',
         threatClassification: 'Session Token / Cookie Exfiltration Attempt',
-        systemId: 'NOUN-HRMS',
+        systemId: 'NOUN-HRMS & THE-WATCH-SOC',
         blockedBy: 'Analyst Ibrahim Danjuma (Tier 2)',
         blockedAtWat: getWATFormattedDate(new Date(Date.now() - 7200000)),
-        expiresAtWat: getWATFormattedDate(new Date(Date.now() + 79200000)),
+        expiresAtWat: 'PERMANENT (Until Unlocked by Super Admin)',
         status: 'ACTIVE',
         requestCountBlocked: 67,
       },
       {
         ip: '45.154.255.89',
-        reason: 'Directory Traversal & Sensitive File Exposure',
+        reason: 'Directory Traversal & Sensitive File Exposure — Permanent Lockout Across The Watch & NOUN-HRMS',
         threatClassification: 'UNIX System File Access Probe',
-        systemId: 'Clinic-EHR',
+        systemId: 'NOUN-HRMS & THE-WATCH-SOC',
         blockedBy: 'Automated Playbook PB-PATH-01',
         blockedAtWat: getWATFormattedDate(new Date(Date.now() - 14400000)),
-        expiresAtWat: getWATFormattedDate(new Date(Date.now() + 72000000)),
+        expiresAtWat: 'PERMANENT (Until Unlocked by Super Admin)',
         status: 'ACTIVE',
         requestCountBlocked: 39,
       },
@@ -643,39 +645,78 @@ export class SocEngine {
     };
   }
 
-  // ===================== IP BLOCKLIST (FIREWALL) =====================
-  public whitelistOperatorIp(ip: string): void {
-    const clean = (ip || '').trim();
-    if (!clean) return;
-    this.operatorWhitelistedIps.add(clean);
-    const existing = this.blocklist.get(clean);
-    if (existing) {
-      existing.status = 'REVOKED';
+  // ===================== IP BLOCKLIST (PERMANENT UNTIL SUPER ADMIN UNLOCK) =====================
+  public async syncFromDatabase(): Promise<void> {
+    try {
+      const persisted = await db.getBlockedIps();
+      for (const row of persisted) {
+        this.blocklist.set(row.ip, {
+          id: row.id,
+          ip: row.ip,
+          reason: row.reason,
+          threatClassification: row.threat_classification,
+          systemId: row.system_id || 'NOUN-HRMS & THE-WATCH-SOC',
+          blockedBy: row.blocked_by,
+          blockedAtWat: row.blocked_at_wat,
+          expiresAtWat: row.expires_at_wat || 'PERMANENT (Until Unlocked by Super Admin)',
+          status: row.status === 'REVOKED' ? 'REVOKED' : 'ACTIVE',
+          requestCountBlocked: Number(row.request_count_blocked) || 0,
+          unlockedBy: row.unlocked_by || undefined,
+          unlockedAtWat: row.unlocked_at_wat || undefined,
+        });
+      }
+      // Also ensure initial seeded entries are persisted in PostgreSQL
+      for (const entry of this.blocklist.values()) {
+        await db.saveBlockedIp(entry);
+      }
+    } catch (err) {
+      console.warn('[SOC Engine] Blocklist DB sync skipped:', (err as Error)?.message);
     }
   }
 
+  public whitelistOperatorIp(_ip: string): void {
+    // No-op for regular operators: Blocked IPs remain permanently blocked across The Watch and NOUN-HRMS
+    // until explicitly unlocked by a verified SUPER_ADMIN via unblockIp().
+  }
+
   public isOperatorWhitelisted(ip: string): boolean {
-    return this.operatorWhitelistedIps.has((ip || '').trim());
+    const clean = (ip || '').trim();
+    return clean === '127.0.0.1' || clean === '::1' || clean === '::ffff:127.0.0.1';
   }
 
   public isIpBlocked(ip: string): boolean {
     const clean = (ip || '').trim();
-    if (this.operatorWhitelistedIps.has(clean)) {
-      return false;
-    }
+    if (!clean) return false;
     const entry = this.blocklist.get(clean);
     return !!entry && entry.status === 'ACTIVE';
   }
 
+  public getBlockEntry(ip: string): IpBlocklistEntry | undefined {
+    const clean = (ip || '').trim();
+    return this.blocklist.get(clean);
+  }
+
+  public getActiveBlockedIps(): string[] {
+    return Array.from(this.blocklist.values())
+      .filter((b) => b.status === 'ACTIVE')
+      .map((b) => b.ip);
+  }
+
   public recordBlockedRequest(ip: string) {
-    const entry = this.blocklist.get(ip);
+    const clean = (ip || '').trim();
+    const entry = this.blocklist.get(clean);
     if (entry) {
       entry.requestCountBlocked += 1;
+      db.incrementBlockedIpCount(clean).catch(() => {});
     }
   }
 
   public getBlocklist(): IpBlocklistEntry[] {
-    return Array.from(this.blocklist.values()).sort((a, b) => (b.status === 'ACTIVE' ? 1 : 0) - (a.status === 'ACTIVE' ? 1 : 0));
+    return Array.from(this.blocklist.values()).sort((a, b) => {
+      const statusDiff = (b.status === 'ACTIVE' ? 1 : 0) - (a.status === 'ACTIVE' ? 1 : 0);
+      if (statusDiff !== 0) return statusDiff;
+      return a.ip.localeCompare(b.ip);
+    });
   }
 
   public blockIp(data: {
@@ -687,33 +728,38 @@ export class SocEngine {
     durationHours?: number;
   }): IpBlocklistEntry {
     const cleanIp = data.ip.trim();
-    const duration = data.durationHours || 24;
-    const isProtectedOperator = this.operatorWhitelistedIps.has(cleanIp);
+    const existing = this.blocklist.get(cleanIp);
     const entry: IpBlocklistEntry = {
-      id: `blk-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: existing?.id || `blk-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       ip: cleanIp,
-      reason: isProtectedOperator ? `${data.reason} [SOC Operator IP Protected from Self-Lockout]` : data.reason,
-      threatClassification: data.threatClassification || 'Manual SOC Quarantine',
-      systemId: data.systemId || 'NOUN-HRMS',
-      blockedBy: data.blockedBy || 'Security Operator',
+      reason: data.reason,
+      threatClassification: data.threatClassification || 'Permanent SOC Quarantine',
+      systemId: 'NOUN-HRMS & THE-WATCH-SOC',
+      blockedBy: data.blockedBy || 'The Watch SOC Firewall',
       blockedAtWat: getWATFormattedDate(),
-      expiresAtWat: getWATFormattedDate(new Date(Date.now() + duration * 3600000)),
-      status: isProtectedOperator ? 'REVOKED' : 'ACTIVE',
-      requestCountBlocked: 0,
+      expiresAtWat: 'PERMANENT (Until Unlocked by Super Admin)',
+      status: 'ACTIVE',
+      requestCountBlocked: existing ? existing.requestCountBlocked : 0,
+      unlockedBy: undefined,
+      unlockedAtWat: undefined,
     };
     this.blocklist.set(entry.ip, entry);
+    db.saveBlockedIp(entry).catch(() => {});
     return entry;
   }
 
-  public unblockIp(ip: string): boolean {
+  public unblockIp(ip: string, unlockedBy: string = 'Super Admin'): boolean {
     const clean = decodeURIComponent(ip || '').trim();
-    this.operatorWhitelistedIps.add(clean);
     const entry = this.blocklist.get(clean);
+    const unlockedAtWat = getWATFormattedDate();
     if (entry) {
       entry.status = 'REVOKED';
+      entry.unlockedBy = unlockedBy;
+      entry.unlockedAtWat = unlockedAtWat;
+      db.updateBlockedIpStatus(clean, 'REVOKED', unlockedBy, unlockedAtWat).catch(() => {});
       return true;
     }
-    return true;
+    return false;
   }
 
   // ===================== THREAT INTELLIGENCE (IOCS) =====================

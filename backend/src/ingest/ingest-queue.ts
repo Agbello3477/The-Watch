@@ -246,14 +246,13 @@ export class IngestQueue {
         capturedPayload: incident.captured_payload,
       });
 
-      if (threatMatch.severity === 'CRITICAL') {
+      if (!socEngine.isOperatorWhitelisted(clientIp)) {
         socEngine.blockIp({
           ip: clientIp,
-          reason: `Automated SOC Quarantine: ${threatMatch.threatClassification}`,
+          reason: `Automated SOC Quarantine: ${threatMatch.threatClassification} on ${systemId} (${path})`,
           threatClassification: threatMatch.threatClassification,
-          systemId,
+          systemId: 'NOUN-HRMS & THE-WATCH-SOC',
           blockedBy: 'The Watch Heuristic WAF Engine',
-          durationHours: 24,
         });
       }
 
@@ -298,7 +297,7 @@ export class IngestQueue {
       await notificationDispatcher.dispatchIncidentAlert(incident);
       realtimeAlertHub.broadcastThreat(incident);
 
-      // SOC Escalation: Create Case
+      // SOC Escalation: Create Case & permanently block IP across both systems
       socEngine.createCaseFromIncident({
         id: incident.id,
         systemId,
@@ -308,6 +307,16 @@ export class IngestQueue {
         targetEndpoint: path,
         capturedPayload: incident.captured_payload,
       });
+
+      if (!socEngine.isOperatorWhitelisted(clientIp)) {
+        socEngine.blockIp({
+          ip: clientIp,
+          reason: `Automated SOC Quarantine: ${incident.threat_classification} on ${systemId}`,
+          threatClassification: incident.threat_classification,
+          systemId: 'NOUN-HRMS & THE-WATCH-SOC',
+          blockedBy: 'The Watch DDoS & Brute-Force Guard',
+        });
+      }
 
       return;
     }

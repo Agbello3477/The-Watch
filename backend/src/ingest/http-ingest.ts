@@ -1,12 +1,14 @@
 import { Router, Response } from 'express';
 import { authenticateTenant, AuthenticatedTenantRequest } from '../middleware/tenant-auth';
 import { ingestQueue, TelemetryPayload } from './ingest-queue';
+import { socEngine } from '../soc/soc-engine';
 
 export const httpIngestRouter = Router();
 
 /**
  * Non-blocking HTTP Telemetry Ingest Gateway
  * Monitored systems ship logs asynchronously without blocking primary transactions
+ * and receive the live permanent SOC IP blocklist to enforce on NOUN-HRMS
  */
 httpIngestRouter.post('/ingest', authenticateTenant, (req: AuthenticatedTenantRequest, res: Response) => {
   const tenant = req.tenant!;
@@ -36,11 +38,19 @@ httpIngestRouter.post('/ingest', authenticateTenant, (req: AuthenticatedTenantRe
   // Non-blocking asynchronous enqueuing
   ingestQueue.enqueue(items);
 
-  // Return immediate 202 Accepted (<5ms)
+  const activeBlockedIps = socEngine.getActiveBlockedIps();
+  const quarantinedClients = items
+    .map((i) => i.clientIp)
+    .filter((ip) => socEngine.isIpBlocked(ip));
+
+  // Return immediate 202 Accepted (<5ms) along with active blocked IPs for NOUN-HRMS enforcement
   res.status(202).json({
     status: 'ACCEPTED',
     systemId: tenant.systemId,
     receivedCount: items.length,
+    activeBlockedIps,
+    quarantinedClients,
+    unlockPolicy: 'SUPER_ADMIN_ONLY',
     queuedAt: new Date().toISOString(),
   });
 });

@@ -164,7 +164,11 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
   };
 
   const handleUnblockIp = async (ip: string) => {
-    if (!confirm(`Are you sure you want to unblock ${ip} from the SOC Ingest Firewall?`)) return;
+    if (currentUser?.role !== 'SUPER_ADMIN') {
+      alert('ACCESS DENIED: Only The Watch Super Admin (SUPER_ADMIN) has authority to unlock a blocked IP address across The Watch and NOUN-HRMS.');
+      return;
+    }
+    if (!confirm(`SUPER ADMIN AUTHORIZATION: Are you sure you want to unlock ${ip} and restore access to both The Watch and NOUN-HRMS?`)) return;
     try {
       await api.unblockIp(ip);
       fetchSocData();
@@ -594,14 +598,14 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
       {/* ──── TAB 2: INGEST FIREWALL & IP BLOCKLIST ──── */}
       {activeSubTab === 'firewall' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 border border-slate-700 rounded-xl p-4">
             <div>
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
                 <Ban className="w-5 h-5 text-red-400" />
-                Active Ingest Edge Firewall & Quarantined IPs
+                Permanent Cross-System Firewall & Quarantined IPs (The Watch + NOUN-HRMS)
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Requests from these IP addresses are dropped immediately by The Watch Ingest Engine with HTTP 403 Forbidden.
+                Any IP in this blocklist is <strong className="text-slate-100">permanently denied access</strong> across both <span className="text-blue-400 font-mono">THE-WATCH-SOC</span> and <span className="text-blue-400 font-mono">NOUN-HRMS</span> with HTTP 403 Forbidden until explicitly unlocked by <strong className="text-emerald-400">The Watch Super Admin</strong>.
               </p>
             </div>
             <button
@@ -613,52 +617,66 @@ export const SocCommandCenter: React.FC<SocCommandCenterProps> = ({ currentUser,
             </button>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-300 font-mono">
-                <thead className="bg-slate-950/80 border-b border-slate-800 text-[11px] uppercase text-slate-400">
+                <thead className="bg-slate-950 border-b border-slate-700 text-[11px] uppercase text-slate-400">
                   <tr>
                     <th className="px-5 py-3">Quarantined IP</th>
                     <th className="px-5 py-3">Trigger Reason / Classification</th>
-                    <th className="px-5 py-3">Blocked By</th>
-                    <th className="px-5 py-3">Blocked WAT</th>
+                    <th className="px-5 py-3">Enforced Systems</th>
+                    <th className="px-5 py-3">Lockout Policy</th>
                     <th className="px-5 py-3">Dropped Reqs</th>
                     <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Actions</th>
+                    <th className="px-5 py-3 text-right">Super Admin Unlock</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-slate-700">
                   {blocklist.map((entry) => (
-                    <tr key={entry.id} className="hover:bg-slate-800/40 transition">
+                    <tr key={entry.id} className="odd:bg-slate-900 even:bg-slate-800/35 hover:bg-slate-800/80 transition">
                       <td className="px-5 py-3 font-bold text-red-400">{entry.ip}</td>
-                      <td className="px-5 py-3 text-slate-200">
-                        <div>{entry.threatClassification}</div>
-                        <div className="text-[10px] text-slate-500">{entry.reason}</div>
+                      <td className="px-5 py-3 text-slate-100">
+                        <div className="font-bold">{entry.threatClassification}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{entry.reason}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">Blocked by {entry.blockedBy} · {entry.blockedAtWat}</div>
                       </td>
-                      <td className="px-5 py-3 text-slate-400">{entry.blockedBy}</td>
-                      <td className="px-5 py-3 text-[11px] text-slate-400">{entry.blockedAtWat}</td>
-                      <td className="px-5 py-3 font-bold text-cyan-400">{entry.requestCountBlocked} dropped</td>
                       <td className="px-5 py-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            entry.status === 'ACTIVE'
-                              ? 'bg-red-950 text-red-300 border border-red-800'
-                              : 'bg-slate-800 text-slate-400'
-                          }`}
-                        >
-                          {entry.status}
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-blue-400 border border-slate-700 text-[10px] font-bold">
+                          THE-WATCH &amp; NOUN-HRMS
                         </span>
+                      </td>
+                      <td className="px-5 py-3 text-[11px] text-orange-400 font-bold">
+                        {entry.expiresAtWat || 'PERMANENT (Until Super Admin Unlock)'}
+                      </td>
+                      <td className="px-5 py-3 font-bold text-blue-400">{entry.requestCountBlocked} dropped</td>
+                      <td className="px-5 py-3">
+                        <SocSeverityBadge
+                          severity={entry.status === 'ACTIVE' ? 'CRITICAL' : 'RESOLVED'}
+                          label={entry.status === 'ACTIVE' ? 'LOCKED (ACTIVE)' : 'UNLOCKED'}
+                          pulse={entry.status === 'ACTIVE'}
+                        />
                       </td>
                       <td className="px-5 py-3 text-right">
                         {entry.status === 'ACTIVE' ? (
-                          <button
-                            onClick={() => handleUnblockIp(entry.ip)}
-                            className="px-2.5 py-1 rounded bg-slate-800 hover:bg-emerald-950/60 text-slate-300 hover:text-emerald-400 border border-slate-700 transition"
-                          >
-                            Unblock
-                          </button>
+                          currentUser?.role === 'SUPER_ADMIN' ? (
+                            <button
+                              onClick={() => handleUnblockIp(entry.ip)}
+                              className="px-2.5 py-1 rounded bg-slate-800 hover:bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold text-[10px] transition flex items-center gap-1 ml-auto"
+                            >
+                              <KeyRound className="w-3 h-3" />
+                              <span>Unlock IP (Super Admin)</span>
+                            </button>
+                          ) : (
+                            <span
+                              title="Only The Watch Super Admin can unlock a quarantined IP address"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[10px]"
+                            >
+                              <Lock className="w-3 h-3 text-orange-400" />
+                              <span>Super Admin Only</span>
+                            </span>
+                          )
                         ) : (
-                          <span className="text-[10px] text-slate-500">Revoked</span>
+                          <span className="text-[10px] text-emerald-400">Unlocked by Super Admin</span>
                         )}
                       </td>
                     </tr>

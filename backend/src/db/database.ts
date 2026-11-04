@@ -208,7 +208,7 @@ class DatabaseManager {
           const sql = fs.readFileSync(schemaPath, 'utf-8');
           await client.query(sql);
         }
-        // Auto-migrate audit log columns if not present
+        // Auto-migrate audit log columns & permanent IP blocklist table if not present
         await client.query(`
           ALTER TABLE IF EXISTS user_audit_logs 
           ADD COLUMN IF NOT EXISTS system_id VARCHAR(64) DEFAULT 'NOUN-HRMS',
@@ -217,6 +217,22 @@ class DatabaseManager {
           ADD COLUMN IF NOT EXISTS location VARCHAR(255),
           ADD COLUMN IF NOT EXISTS geo_city VARCHAR(128),
           ADD COLUMN IF NOT EXISTS geo_country VARCHAR(128);
+
+          CREATE TABLE IF NOT EXISTS soc_ip_blocklist (
+            id VARCHAR(64) PRIMARY KEY,
+            ip VARCHAR(64) UNIQUE NOT NULL,
+            reason TEXT NOT NULL,
+            threat_classification VARCHAR(255) NOT NULL,
+            system_id VARCHAR(64) NOT NULL DEFAULT 'NOUN-HRMS & THE-WATCH-SOC',
+            blocked_by VARCHAR(255) NOT NULL,
+            blocked_at_wat VARCHAR(64) NOT NULL,
+            expires_at_wat VARCHAR(128) NOT NULL DEFAULT 'PERMANENT (Until Unlocked by Super Admin)',
+            status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+            request_count_blocked INTEGER DEFAULT 0,
+            unlocked_by VARCHAR(255),
+            unlocked_at_wat VARCHAR(64),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
         `).catch(() => {});
         client.release();
         this.isPostgresConnected = true;
@@ -1219,6 +1235,88 @@ class DatabaseManager {
     let reports = this.memoryStore.auditReports;
     if (systemId) reports = reports.filter((r) => r.system_id === systemId);
     return reports;
+  }
+
+  // ===================== PERMANENT SOC IP BLOCKLIST =====================
+  public async saveBlockedIp(entry: {
+    id: string;
+    ip: string;
+    reason: string;
+    threatClassification: string;
+    systemId: string;
+    blockedBy: string;
+    blockedAtWat: string;
+    expiresAtWat: string;
+    status: 'ACTIVE' | 'REVOKED';
+    requestCountBlocked: number;
+  }): Promise<void> {
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        await this.pgPool.query(
+          `INSERT INTO soc_ip_blocklist (id, ip, reason, threat_classification, system_id, blocked_by, blocked_at_wat, expires_at_wat, status, request_count_blocked)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           ON CONFLICT (ip) DO UPDATE SET
+             reason = EXCLUDED.reason,
+             threat_classification = EXCLUDED.threat_classification,
+             system_id = EXCLUDED.system_id,
+             blocked_by = EXCLUDED.blocked_by,
+             blocked_at_wat = EXCLUDED.blocked_at_wat,
+             expires_at_wat = EXCLUDED.expires_at_wat,
+             status = EXCLUDED.status`,
+          [
+            entry.id,
+            entry.ip,
+            entry.reason,
+            entry.threatClassification,
+            entry.systemId,
+            entry.blockedBy,
+            entry.blockedAtWat,
+            entry.expiresAtWat,
+            entry.status,
+            entry.requestCountBlocked || 0,
+          ]
+        );
+      } catch (e) {}
+    }
+  }
+
+  public async getBlockedIps(): Promise<any[]> {
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        const res = await this.pgPool.query('SELECT * FROM soc_ip_blocklist ORDER BY created_at DESC');
+        return res.rows;
+      } catch (e) {}
+    }
+    return [];
+  }
+
+  public async updateBlockedIpStatus(
+    ip: string,
+    status: 'ACTIVE' | 'REVOKED',
+    unlockedBy?: string,
+    unlockedAtWat?: string
+  ): Promise<void> {
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        await this.pgPool.query(
+          `UPDATE soc_ip_blocklist
+           SET status = $1, unlocked_by = $2, unlocked_at_wat = $3
+           WHERE ip = $4`,
+          [status, unlockedBy || null, unlockedAtWat || null, ip]
+        );
+      } catch (e) {}
+    }
+  }
+
+  public async incrementBlockedIpCount(ip: string): Promise<void> {
+    if (this.isPostgresConnected && this.pgPool) {
+      try {
+        await this.pgPool.query(
+          `UPDATE soc_ip_blocklist SET request_count_blocked = request_count_blocked + 1 WHERE ip = $1`,
+          [ip]
+        );
+      } catch (e) {}
+    }
   }
 
   // ===================== OVERVIEW COMPUTATION =====================

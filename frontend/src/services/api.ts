@@ -69,30 +69,12 @@ function getAuthHeaders(): HeadersInit {
 export const api = {
   // ================= AUTHENTICATION =================
   async login(credentials: { email: string; password: string }): Promise<LoginResponse> {
-    let res = await fetch(`${API_BASE}/auth/login`, {
+    const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials),
     });
-    let data = await res.json();
-
-    // Auto-recover if the SOC Operator's own IP was accidentally quarantined during threat testing
-    if (res.status === 403 && (data.error === 'IP_QUARANTINED_BY_THE_WATCH_SOC' || (data as any).ip)) {
-      const blockedIp = (data as any).ip || 'SELF';
-      try {
-        await fetch(`${API_BASE}/soc/blocklist/${encodeURIComponent(blockedIp)}`, {
-          method: 'DELETE',
-        });
-        res = await fetch(`${API_BASE}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(credentials),
-        });
-        data = await res.json();
-      } catch (err) {
-        console.warn('[Auth] Auto-release of operator IP quarantine failed:', err);
-      }
-    }
+    const data = await res.json();
 
     if (res.ok && data.success && data.token && data.user) {
       authStorage.setToken(data.token);
@@ -103,22 +85,9 @@ export const api = {
 
   async getMe(): Promise<{ user?: AuthSessionUser; sessionValid: boolean }> {
     try {
-      let res = await fetch(`${API_BASE}/auth/me`, {
+      const res = await fetch(`${API_BASE}/auth/me`, {
         headers: getAuthHeaders(),
       });
-      if (res.status === 403) {
-        try {
-          const errData = await res.clone().json();
-          if (errData?.error === 'IP_QUARANTINED_BY_THE_WATCH_SOC' && errData?.ip) {
-            await fetch(`${API_BASE}/soc/blocklist/${encodeURIComponent(errData.ip)}`, {
-              method: 'DELETE',
-            });
-            res = await fetch(`${API_BASE}/auth/me`, {
-              headers: getAuthHeaders(),
-            });
-          }
-        } catch {}
-      }
       if (!res.ok) {
         authStorage.clear();
         return { sessionValid: false };
@@ -572,7 +541,11 @@ export const api = {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || data.error || 'Only The Watch Super Admin can unlock a blocked IP address.');
+    }
+    return data;
   },
 
   async getSocIocs(): Promise<{ iocs: IocEntry[]; total: number }> {

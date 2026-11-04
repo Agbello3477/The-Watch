@@ -142,7 +142,9 @@ export const ConnectionPanel: React.FC = () => {
   };
 
   const sentinelAgentCode = `// ─── sentinel-agent.ts ───────────────────────────────────────
-// Drop-in middleware. Mount BEFORE all your routes.
+// Drop-in Active Firewall & Telemetry Middleware for ${selectedTenant}.
+// Mount BEFORE all your routes. Any IP blocked on The Watch is permanently
+// denied access to both ${selectedTenant} and The Watch until unlocked by The Watch Super Admin.
 //
 // Your HRMS .env:
 //   THE_WATCH_URL=${sdkConfig?.ingestUrl?.replace('/api/v1/telemetry/ingest', '') || API}
@@ -151,12 +153,55 @@ export const ConnectionPanel: React.FC = () => {
 
 import type { Request, Response, NextFunction } from 'express';
 
-const INGEST = \`\${process.env.THE_WATCH_URL}/api/v1/telemetry/ingest\`;
-const KEY    = process.env.THE_WATCH_API_KEY || '';
-const SYSTEM = process.env.THE_WATCH_SYSTEM_ID || '${selectedTenant}';
+const WATCH_URL     = process.env.THE_WATCH_URL || '${sdkConfig?.ingestUrl?.replace('/api/v1/telemetry/ingest', '') || API}';
+const INGEST        = \`\${WATCH_URL}/api/v1/telemetry/ingest\`;
+const BLOCKLIST_URL = \`\${WATCH_URL}/api/v1/soc/blocklist/active-ips\`;
+const KEY           = process.env.THE_WATCH_API_KEY || '';
+const SYSTEM        = process.env.THE_WATCH_SYSTEM_ID || '${selectedTenant}';
+
+// Live in-memory set of quarantined IPs synced from The Watch SOC
+const blockedIps = new Set<string>();
+
+async function syncBlocklistFromWatch() {
+  try {
+    const res = await fetch(BLOCKLIST_URL, { headers: { 'X-Telemetry-Key': KEY } });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.activeIps)) {
+        blockedIps.clear();
+        data.activeIps.forEach((ip: string) => blockedIps.add(ip.trim()));
+      }
+    }
+  } catch {}
+}
+syncBlocklistFromWatch();
+setInterval(syncBlocklistFromWatch, 10000); // Sync every 10s with The Watch Super Admin Blocklist
 
 export function sentinelAgent(req: Request, res: Response, next: NextFunction) {
   const t0 = Date.now();
+  const clientIp = (req.headers['x-forwarded-for']?.toString().split(',')[0] || req.ip || '127.0.0.1').trim();
+
+  // 1. Enforce Permanent SOC Blocklist BEFORE route execution on ${selectedTenant}
+  if (blockedIps.has(clientIp)) {
+    fetch(INGEST, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Telemetry-Key': KEY },
+      body: JSON.stringify({
+        systemId: SYSTEM, method: req.method, path: req.originalUrl,
+        statusCode: 403, latencyMs: 1, clientIp,
+        userAgent: req.headers['user-agent'],
+        payloadSnippet: '[BLOCKED_BY_SOC_FIREWALL] Quarantined IP denied access on ' + SYSTEM,
+      }),
+    }).catch(() => {});
+
+    return res.status(403).json({
+      error: 'IP_QUARANTINED_BY_THE_WATCH_SOC',
+      code: 'IP_QUARANTINED',
+      message: \`ACCESS PERMANENTLY DENIED: Your IP address (\${clientIp}) is blocked across both \${SYSTEM} and The Watch SOC. Access cannot be restored unless unlocked by The Watch Super Admin.\`,
+      ip: clientIp,
+    });
+  }
+
   res.on('finish', () => {
     const body = { ...req.body };
     ['password','token','secret','bvn','pin'].forEach(k => { if (body[k]) body[k] = '[REDACTED]'; });
@@ -166,12 +211,20 @@ export function sentinelAgent(req: Request, res: Response, next: NextFunction) {
       body: JSON.stringify({
         systemId: SYSTEM, method: req.method, path: req.originalUrl,
         statusCode: res.statusCode, latencyMs: Date.now() - t0,
-        clientIp: req.headers['x-forwarded-for']?.toString().split(',')[0] || req.ip,
+        clientIp,
         userAgent: req.headers['user-agent'],
         payloadSnippet: JSON.stringify(body).slice(0, 300),
         errorMessage: res.statusCode >= 500 ? \`HTTP \${res.statusCode}\` : undefined,
       }),
-    }).catch(() => {}); // fire-and-forget — never blocks HRMS
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data?.activeBlockedIps)) {
+          blockedIps.clear();
+          data.activeBlockedIps.forEach((ip: string) => blockedIps.add(ip.trim()));
+        }
+      })
+      .catch(() => {}); // fire-and-forget — never blocks HRMS
   });
   next();
 }

@@ -30,6 +30,7 @@ import { geoIPService } from './threat/geoip-service';
 import { realtimeAlertHub } from './alerts/realtime-alert-hub';
 import { notificationDispatcher } from './alerts/notification-dispatcher';
 import { socEngine } from './soc/soc-engine';
+import { authService } from './auth/auth-service';
 import { getWATFormattedDate } from './db/database';
 
 export const app = express();
@@ -42,9 +43,72 @@ app.use(cors({
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Active Self-Defense WAF & Real-Time Intrusion Detection Middleware for The Watch Platform
+// Active Self-Defense WAF & Permanent Cross-System IP Blocklist Enforcement Middleware
 app.use(async (req, res, next) => {
-  // Skip internal SSE stream, alert rerouting, SOC management, surface scanner & simulation/ingest endpoints
+  const clientIp = ((req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1')
+    .split(',')[0]
+    .trim();
+
+  // Check if caller carries a valid SUPER_ADMIN session token
+  let isSuperAdminSession = false;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const decoded = authService.verifyToken(authHeader.slice(7).trim());
+    if (decoded?.role === 'SUPER_ADMIN') {
+      isSuperAdminSession = true;
+    }
+  }
+
+  // 1. Enforce Permanent SOC IP Blocklist BEFORE any route exemptions!
+  // Any blocked IP is denied access to the entire Watch platform and NOUN-HRMS unless:
+  // - Authenticated as SUPER_ADMIN, OR
+  // - Calling POST /api/v1/auth/login (which itself rejects any non-SUPER_ADMIN from a blocked IP), OR
+  // - NOUN-HRMS Sentinel Agent syncing the blocklist (/api/v1/soc/blocklist/active-ips, /api/v1/soc/blocklist/check/*, /api/v1/telemetry/ingest)
+  const isBlocklistSyncEndpoint =
+    req.path === '/api/v1/auth/login' ||
+    req.path === '/api/v1/soc/blocklist/active-ips' ||
+    req.path.startsWith('/api/v1/soc/blocklist/check/') ||
+    req.path === '/api/v1/telemetry/ingest';
+
+  if (socEngine.isIpBlocked(clientIp) && !isSuperAdminSession && !isBlocklistSyncEndpoint) {
+    socEngine.recordBlockedRequest(clientIp);
+    const blockEntry = socEngine.getBlockEntry(clientIp);
+    db.saveTelemetryLog({
+      id: `tel-watch-blk-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      system_id: 'THE-WATCH-SOC',
+      method: req.method,
+      path: req.originalUrl || req.path,
+      status_code: 403,
+      latency_ms: 1,
+      client_ip: clientIp,
+      payload_snippet: `[BLOCKED_BY_SOC_FIREWALL] Quarantined IP (${clientIp}) permanently denied access across The Watch & NOUN-HRMS`,
+      user_agent: req.headers['user-agent'],
+      headers_json: JSON.stringify({
+        verdict: 'MALICIOUS_BLOCKED',
+        threatClassification: blockEntry?.threatClassification || 'Quarantined IP Firewall Drop',
+        direction: 'INBOUND_REQ',
+        protocol: 'HTTPS/TLSv1.3',
+        sourcePort: 50000 + Math.floor(Math.random() * 14000),
+        destIp: '10.20.0.10 (THE-WATCH-SOC)',
+        destPort: 443,
+        lengthBytes: 420,
+      }),
+    }).catch(() => {});
+
+    res.status(403).json({
+      error: 'IP_QUARANTINED_BY_THE_WATCH_SOC',
+      code: 'IP_QUARANTINED',
+      message: `ACCESS PERMANENTLY DENIED: Your IP address (${clientIp}) is blocked across both The Watch SOC and NOUN-HRMS. Access cannot be restored unless unlocked by The Watch Super Admin.`,
+      ip: clientIp,
+      enforcedSystems: ['THE-WATCH-SOC', 'NOUN-HRMS'],
+      unlockAuthority: 'SUPER_ADMIN_ONLY',
+      reason: blockEntry?.reason,
+      timestampWat: getWATFormattedDate(),
+    });
+    return;
+  }
+
+  // Skip internal SSE stream, alert rerouting, SOC management, surface scanner & simulation/ingest endpoints for heuristic payload scanning
   if (
     req.path.startsWith('/api/v1/telemetry') ||
     req.path.startsWith('/api/v1/simulation') ||
@@ -58,52 +122,6 @@ app.use(async (req, res, next) => {
     req.path.startsWith('/api/v1/audit/track')
   ) {
     return next();
-  }
-
-  const clientIp = ((req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1')
-    .split(',')[0]
-    .trim();
-
-  // Automatically protect authenticated SOC Operators from accidental self-quarantine
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-    socEngine.whitelistOperatorIp(clientIp);
-  }
-
-  // 1. Enforce Active SOC IP Blocklist (Never block /api/v1/auth/* or /api/v1/soc/blocklist so SOC Admins can always sign in and manage quarantine)
-  if (
-    socEngine.isIpBlocked(clientIp) &&
-    !req.path.startsWith('/api/v1/soc/blocklist') &&
-    !req.path.startsWith('/api/v1/auth')
-  ) {
-    socEngine.recordBlockedRequest(clientIp);
-    db.saveTelemetryLog({
-      id: `tel-watch-blk-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      system_id: 'THE-WATCH-SOC',
-      method: req.method,
-      path: req.originalUrl || req.path,
-      status_code: 403,
-      latency_ms: 1,
-      client_ip: clientIp,
-      payload_snippet: `[BLOCKED_BY_SOC_FIREWALL] Quarantined IP (${clientIp}) dropped at Edge Firewall`,
-      user_agent: req.headers['user-agent'],
-      headers_json: JSON.stringify({
-        verdict: 'MALICIOUS_BLOCKED',
-        threatClassification: 'Quarantined IP Firewall Drop',
-        direction: 'INBOUND_REQ',
-        protocol: 'HTTPS/TLSv1.3',
-        sourcePort: 50000 + Math.floor(Math.random() * 14000),
-        destIp: '10.20.0.10 (THE-WATCH-SOC)',
-        destPort: 443,
-        lengthBytes: 420,
-      }),
-    }).catch(() => {});
-    res.status(403).json({
-      error: 'IP_QUARANTINED_BY_THE_WATCH_SOC',
-      message: `Access Denied: Your IP address (${clientIp}) has been blocked by The Watch Active Intrusion Firewall.`,
-      ip: clientIp,
-      timestampWat: getWATFormattedDate(),
-    });
-    return;
   }
 
   // 2. Inspect URL, query params, and request body for hacking / exploit signatures targeting The Watch
@@ -154,6 +172,26 @@ app.use(async (req, res, next) => {
         targetEndpoint: incident.target_endpoint,
         capturedPayload: incident.captured_payload,
       });
+
+      if (!isSuperAdminSession && !socEngine.isOperatorWhitelisted(clientIp)) {
+        socEngine.blockIp({
+          ip: clientIp,
+          reason: `Automated SOC Quarantine: ${match.threatClassification} targeting The Watch (${req.originalUrl || req.path})`,
+          threatClassification: match.threatClassification,
+          systemId: 'NOUN-HRMS & THE-WATCH-SOC',
+          blockedBy: 'The Watch Self-Defense WAF',
+        });
+        res.status(403).json({
+          error: 'IP_QUARANTINED_BY_THE_WATCH_SOC',
+          code: 'IP_QUARANTINED',
+          message: `INTRUSION DETECTED & IP PERMANENTLY BLOCKED: Your IP address (${clientIp}) has been blocked across The Watch and NOUN-HRMS until unlocked by The Watch Super Admin.`,
+          ip: clientIp,
+          enforcedSystems: ['THE-WATCH-SOC', 'NOUN-HRMS'],
+          unlockAuthority: 'SUPER_ADMIN_ONLY',
+          timestampWat: getWATFormattedDate(),
+        });
+        return;
+      }
     } catch (err) {
       console.error('[SelfDefenseWAF] Error recording intrusion attempt:', err);
     }
@@ -328,6 +366,7 @@ async function seedInitialIncidents() {
 
 export async function bootstrap(customPort?: number, customUdpPort?: number) {
   await db.initialize();
+  await socEngine.syncFromDatabase();
   await redis.initialize();
 
   const port = customPort || parseInt(process.env.PORT || '', 10) || CONFIG.PORT;
