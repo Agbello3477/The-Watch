@@ -4,7 +4,16 @@ import {
   RefreshCw, ExternalLink, ShieldCheck, Clock
 } from 'lucide-react';
 
-const API = (import.meta as any).env?.VITE_API_URL || 'http://localhost:4000';
+import { authStorage } from '../services/api';
+
+const rawApiUrl = (import.meta as any).env?.VITE_API_URL || '';
+const API = rawApiUrl ? rawApiUrl.replace(/\/$/, '') : 'http://localhost:4000';
+const API_BASE = rawApiUrl ? `${rawApiUrl.replace(/\/$/, '')}/api/v1` : '/api/v1';
+
+function buildAuthHeaders(): Record<string, string> {
+  const token = authStorage.getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 interface Tenant {
   systemId: string;
@@ -91,7 +100,8 @@ export const ConnectionPanel: React.FC = () => {
 
   const fetchAll = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/v1/tenants`);
+      const headers = buildAuthHeaders();
+      const res = await fetch(`${API_BASE}/tenants`, { headers });
       const data = await res.json();
       const tenantList: Tenant[] = data.tenants || [];
       setTenants(tenantList);
@@ -99,7 +109,7 @@ export const ConnectionPanel: React.FC = () => {
       // Fetch connection status for each tenant in parallel
       const statusResults = await Promise.all(
         tenantList.map((t) =>
-          fetch(`${API}/api/v1/tenants/${t.systemId}/connection-status`)
+          fetch(`${API_BASE}/tenants/${t.systemId}/connection-status`, { headers })
             .then((r) => r.json())
             .catch(() => ({ systemId: t.systemId, status: 'DISCONNECTED', isConnected: false, message: 'Unable to check status', lastSeen: null, minutesSinceLastPing: null, recentRequestCount: 0 }))
         )
@@ -118,7 +128,9 @@ export const ConnectionPanel: React.FC = () => {
 
   const fetchSdkConfig = useCallback(async (systemId: string) => {
     try {
-      const res = await fetch(`${API}/api/v1/tenants/${systemId}/sdk-config`);
+      const res = await fetch(`${API_BASE}/tenants/${systemId}/sdk-config`, {
+        headers: buildAuthHeaders(),
+      });
       const data = await res.json();
       setSdkConfig(data);
     } catch {

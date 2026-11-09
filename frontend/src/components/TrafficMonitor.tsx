@@ -17,11 +17,16 @@ import {
   CheckCircle2,
   RefreshCw,
 } from 'lucide-react';
-import { api } from '../services/api';
+import { api, authStorage } from '../services/api';
 import { triggerBrowserBlobDownload } from '../utils/pdfExporter';
 
 const rawApiUrl = (import.meta as any).env?.VITE_API_URL || '';
 const API_BASE = rawApiUrl ? `${rawApiUrl.replace(/\/$/, '')}/api/v1` : '/api/v1';
+
+function buildRequestHeaders(): Record<string, string> {
+  const token = authStorage.getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export interface WiresharkPacket {
   id: string;
@@ -105,25 +110,29 @@ export const TrafficMonitor: React.FC<{ selectedSystem: string }> = () => {
 
   const fetchCaptureStream = async () => {
     try {
+      const headers = buildRequestHeaders();
       const [liveRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE}/traffic/live?systemId=${scopeSystem}&limit=180`),
-        fetch(`${API_BASE}/traffic/stats?systemId=${scopeSystem}`),
+        fetch(`${API_BASE}/traffic/live?systemId=${scopeSystem}&limit=180`, { headers }),
+        fetch(`${API_BASE}/traffic/stats?systemId=${scopeSystem}`, { headers }),
       ]);
 
-      if (!liveRes.ok || !statsRes.ok) {
-        throw new Error('Failed to fetch live packet capture stream');
+      if (liveRes.ok) {
+        const liveData = await liveRes.json();
+        const incomingLogs: WiresharkPacket[] = Array.isArray(liveData.logs) ? liveData.logs : [];
+        setPackets(incomingLogs);
+        if (!selectedPacketId && incomingLogs.length > 0) {
+          setSelectedPacketId(incomingLogs[0].id);
+        }
+        setError(null);
+      } else {
+        const errBody = await liveRes.json().catch(() => ({}));
+        setError(errBody?.message || 'Failed to fetch live packet capture stream');
       }
 
-      const liveData = await liveRes.json();
-      const statsData = await statsRes.json();
-
-      const incomingLogs: WiresharkPacket[] = Array.isArray(liveData.logs) ? liveData.logs : [];
-      setPackets(incomingLogs);
-      setStats(statsData);
-      if (!selectedPacketId && incomingLogs.length > 0) {
-        setSelectedPacketId(incomingLogs[0].id);
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData);
       }
-      setError(null);
     } catch (err: any) {
       setError(err.message || 'Unable to reach packet capture engine');
     } finally {

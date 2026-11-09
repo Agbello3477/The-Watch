@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { triggerBrowserBlobDownload } from '../utils/pdfExporter';
 import { SocSeverityBadge } from './SocThemeBadge';
+import { authStorage } from '../services/api';
 
 const rawApiUrl = (import.meta as any).env?.VITE_API_URL || '';
 const API_BASE = rawApiUrl ? `${rawApiUrl.replace(/\/$/, '')}/api/v1` : '/api/v1';
@@ -137,9 +138,13 @@ export const SurfaceScanner: React.FC = () => {
     setError(null);
 
     try {
+      const token = authStorage.getToken();
       const res = await fetch(`${API_BASE}/scanner/inspect`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           target: targetToScan,
           profile: scanProfile,

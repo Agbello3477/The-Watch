@@ -94,64 +94,87 @@ function classifyPacket(log: any, index: number, total: number) {
 trafficRouter.get('/live', async (req: Request, res: Response) => {
   const systemId = (req.query.systemId as string) || 'ALL';
   const limit = Math.min(parseInt(req.query.limit as string) || 150, 500);
-  const rawLogs = await db.getRecentTelemetryLogs(systemId, limit);
-  const logs = rawLogs.map((l, idx) => classifyPacket(l, idx, rawLogs.length));
-  res.json({ logs, systemId, fetchedAt: new Date().toISOString() });
+  try {
+    const rawLogs = await db.getRecentTelemetryLogs(systemId, limit);
+    const logs = rawLogs.map((l, idx) => classifyPacket(l, idx, rawLogs.length));
+    res.json({ logs, systemId, fetchedAt: new Date().toISOString() });
+  } catch (err: any) {
+    console.warn('[Traffic] /live fallback:', err?.message);
+    res.json({ logs: [], systemId, fetchedAt: new Date().toISOString() });
+  }
 });
 
 // GET /api/v1/traffic/stats?systemId=ALL
 trafficRouter.get('/stats', async (req: Request, res: Response) => {
   const systemId = (req.query.systemId as string) || 'ALL';
-  const rawLogs = await db.getRecentTelemetryLogs(systemId, 500);
-  const logs = rawLogs.map((l, idx) => classifyPacket(l, idx, rawLogs.length));
+  try {
+    const rawLogs = await db.getRecentTelemetryLogs(systemId, 500);
+    const logs = rawLogs.map((l, idx) => classifyPacket(l, idx, rawLogs.length));
 
-  const total = logs.length;
-  const healthyGreenCount = logs.filter((l) => l.verdict === 'ALLOWED_HEALTHY').length;
-  const unsuccessfulAmberCount = logs.filter((l) => l.verdict === 'UNSUCCESSFUL').length;
-  const maliciousRedCount = logs.filter((l) => l.verdict === 'MALICIOUS_BLOCKED').length;
+    const total = logs.length;
+    const healthyGreenCount = logs.filter((l) => l.verdict === 'ALLOWED_HEALTHY').length;
+    const unsuccessfulAmberCount = logs.filter((l) => l.verdict === 'UNSUCCESSFUL').length;
+    const maliciousRedCount = logs.filter((l) => l.verdict === 'MALICIOUS_BLOCKED').length;
 
-  const errors = unsuccessfulAmberCount + maliciousRedCount;
-  const ok = healthyGreenCount;
-  const avgLatency =
-    total > 0 ? Math.round(logs.reduce((s: number, l: any) => s + (l.latency_ms || 0), 0) / total) : 0;
-  const slowRequests = logs.filter((l: any) => (l.latency_ms || 0) > 500).length;
+    const errors = unsuccessfulAmberCount + maliciousRedCount;
+    const ok = healthyGreenCount;
+    const avgLatency =
+      total > 0 ? Math.round(logs.reduce((s: number, l: any) => s + (l.latency_ms || 0), 0) / total) : 0;
+    const slowRequests = logs.filter((l: any) => (l.latency_ms || 0) > 500).length;
 
-  const endpointMap: Record<string, number> = {};
-  logs.forEach((l: any) => {
-    const key = `[${l.system_id}] ${l.method} ${l.path}`;
-    endpointMap[key] = (endpointMap[key] || 0) + 1;
-  });
-  const topEndpoints = Object.entries(endpointMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([endpoint, count]) => ({ endpoint, count }));
+    const endpointMap: Record<string, number> = {};
+    logs.forEach((l: any) => {
+      const key = `[${l.system_id}] ${l.method} ${l.path}`;
+      endpointMap[key] = (endpointMap[key] || 0) + 1;
+    });
+    const topEndpoints = Object.entries(endpointMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([endpoint, count]) => ({ endpoint, count }));
 
-  const ipMap: Record<string, number> = {};
-  logs.forEach((l: any) => {
-    ipMap[l.client_ip] = (ipMap[l.client_ip] || 0) + 1;
-  });
-  const topIps = Object.entries(ipMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
-    .map(([ip, count]) => ({ ip, count }));
+    const ipMap: Record<string, number> = {};
+    logs.forEach((l: any) => {
+      ipMap[l.client_ip] = (ipMap[l.client_ip] || 0) + 1;
+    });
+    const topIps = Object.entries(ipMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([ip, count]) => ({ ip, count }));
 
-  const methodMap: Record<string, number> = {};
-  logs.forEach((l: any) => {
-    methodMap[l.method] = (methodMap[l.method] || 0) + 1;
-  });
+    const methodMap: Record<string, number> = {};
+    logs.forEach((l: any) => {
+      methodMap[l.method] = (methodMap[l.method] || 0) + 1;
+    });
 
-  res.json({
-    total,
-    ok,
-    errors,
-    healthyGreenCount,
-    unsuccessfulAmberCount,
-    maliciousRedCount,
-    avgLatency,
-    slowRequests,
-    topEndpoints,
-    topIps,
-    methodBreakdown: methodMap,
-    systemId,
-  });
+    res.json({
+      total,
+      ok,
+      errors,
+      healthyGreenCount,
+      unsuccessfulAmberCount,
+      maliciousRedCount,
+      avgLatency,
+      slowRequests,
+      topEndpoints,
+      topIps,
+      methodBreakdown: methodMap,
+      systemId,
+    });
+  } catch (err: any) {
+    console.warn('[Traffic] /stats fallback:', err?.message);
+    res.json({
+      total: 0,
+      ok: 0,
+      errors: 0,
+      healthyGreenCount: 0,
+      unsuccessfulAmberCount: 0,
+      maliciousRedCount: 0,
+      avgLatency: 0,
+      slowRequests: 0,
+      topEndpoints: [],
+      topIps: [],
+      methodBreakdown: {},
+      systemId,
+    });
+  }
 });

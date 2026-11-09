@@ -18,8 +18,15 @@ import {
   ExternalLink,
 } from 'lucide-react';
 
+import { authStorage } from '../services/api';
+
 const rawApiUrl = (import.meta as any).env?.VITE_API_URL || '';
 const ZEEK_API_BASE = rawApiUrl ? `${rawApiUrl.replace(/\/$/, '')}/api/soc/zeek` : '/api/soc/zeek';
+
+function buildAuthHeaders(): Record<string, string> {
+  const token = authStorage.getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 interface ZeekConnLog {
   ts: string;
@@ -155,11 +162,12 @@ export const ZeekNetworkMonitor: React.FC = () => {
 
   const fetchZeekData = async () => {
     try {
+      const headers = buildAuthHeaders();
       const [connRes, noticeRes, epsRes, intelRes] = await Promise.all([
-        fetch(`${ZEEK_API_BASE}/connections`),
-        fetch(`${ZEEK_API_BASE}/notices`),
-        fetch(`${ZEEK_API_BASE}/metrics/eps`),
-        fetch(`${ZEEK_API_BASE}/intel`),
+        fetch(`${ZEEK_API_BASE}/connections`, { headers }),
+        fetch(`${ZEEK_API_BASE}/notices`, { headers }),
+        fetch(`${ZEEK_API_BASE}/metrics/eps`, { headers }),
+        fetch(`${ZEEK_API_BASE}/intel`, { headers }),
       ]);
 
       if (connRes.ok) {
@@ -197,7 +205,9 @@ export const ZeekNetworkMonitor: React.FC = () => {
     setSelectedConn(found);
     setLoadingTimeline(true);
     try {
-      const res = await fetch(`${ZEEK_API_BASE}/timeline/${encodeURIComponent(uid)}`);
+      const res = await fetch(`${ZEEK_API_BASE}/timeline/${encodeURIComponent(uid)}`, {
+        headers: buildAuthHeaders(),
+      });
       if (res.ok) {
         const data: ZeekTimeline = await res.json();
         setActiveTimeline(data);

@@ -235,6 +235,7 @@ class DatabaseManager {
           );
 
           DELETE FROM threat_incidents WHERE captured_payload LIKE 'Clicked <%';
+          DELETE FROM soc_ip_blocklist WHERE blocked_by = 'The Watch Self-Defense WAF';
         `).catch(() => {});
         client.release();
         this.isPostgresConnected = true;

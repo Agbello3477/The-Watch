@@ -650,6 +650,9 @@ export class SocEngine {
     try {
       const persisted = await db.getBlockedIps();
       for (const row of persisted) {
+        if (row.blocked_by === 'The Watch Self-Defense WAF') {
+          continue;
+        }
         this.blocklist.set(row.ip, {
           id: row.id,
           ip: row.ip,

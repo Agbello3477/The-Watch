@@ -71,6 +71,9 @@ app.use(async (req, res, next) => {
     const decoded = authService.verifyToken(authHeader.slice(7).trim());
     if (decoded?.role === 'SUPER_ADMIN') {
       isSuperAdminSession = true;
+      if (socEngine.getBlockEntry(clientIp)?.blockedBy === 'The Watch Self-Defense WAF') {
+        socEngine.unblockIp(clientIp, 'SUPER_ADMIN_AUTO_RECOVERY');
+      }
     }
   }
 

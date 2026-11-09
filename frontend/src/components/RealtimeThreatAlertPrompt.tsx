@@ -21,7 +21,7 @@ import {
   Mail,
   ShieldCheck,
 } from 'lucide-react';
-import { api } from '../services/api';
+import { api, authStorage } from '../services/api';
 
 export const EMERGENCY_PHONE = '+2347063054357';
 export const EMERGENCY_EMAIL = 'abdulgaffarbello3477@gmail.com';
@@ -795,8 +795,12 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
 
     const pollLiveAlerts = async () => {
       try {
+        const token = authStorage.getToken();
         const res = await fetch(
-          `${API_BASE}/threats/live-alerts?since=${encodeURIComponent(lastTimestampRef.current)}`
+          `${API_BASE}/threats/live-alerts?since=${encodeURIComponent(lastTimestampRef.current)}`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          }
         );
         if (res.ok) {
           const data = await res.json();
