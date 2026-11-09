@@ -27,6 +27,7 @@ export type SocTabKey =
   | 'advisor'
   | 'reports'
   | 'simulator'
+  | 'beef-set'
   | 'traffic'
   | 'scanner'
   | 'zeek'
@@ -140,18 +141,19 @@ export const ObservabilityMatrix: React.FC<ObservabilityMatrixProps> = ({
     },
     {
       level: 'LEVEL 6',
-      name: 'Identity, Session & User Activity Observability (UEBA)',
+      name: 'Identity, Session & Browser/Human-Layer Observability (UEBA)',
       status: 'RESOLVED' as const,
-      statusLabel: 'WAT AUDIT ARMED',
-      engine: 'Real-Time Click, Auth & Document Download Audit Trail',
+      statusLabel: 'WAT AUDIT + ANTI-BEEF/SET',
+      engine: 'Real-Time Click Audit + Anti-BeEF Hook & Anti-SET Clone Guard',
       description:
-        'Captures every operator and staff login, failed login, logout, PDF/CSV export, and interactive UI click enriched with GeoIP city/country, ASN, and WAT timestamps.',
+        'Captures every operator/staff login, logout, PDF/CSV export, UI click, DOM MutationObserver BeEF hook attempt, and SET credential harvester clone with GeoIP & WAT timestamps.',
       metrics: [
-        { label: 'Inactivity Guard', value: '180s Auto-Terminate Session' },
+        { label: 'Inactivity & Hook Guard', value: '180s Timeout + DOM CSP Shield' },
         { label: 'Audit Timezone', value: 'Africa/Lagos (WAT / UTC+1)' },
       ],
       icon: Users,
-      primaryAction: { label: 'View Forensic Audit Reports', tab: 'reports' as SocTabKey },
+      primaryAction: { label: 'Open BeEF & SET Defense', tab: 'beef-set' as SocTabKey },
+      secondaryAction: { label: 'Forensic Audit Reports', tab: 'reports' as SocTabKey },
     },
     {
       level: 'LEVEL 7',

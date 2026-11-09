@@ -50,6 +50,18 @@ export class HeuristicEngine {
     { regex: /\b(sqlmap|nikto|nmap|masscan|dirbuster|gobuster|nuclei|hydra|medusa|burpsuite|metasploit|wpscan|acunetix|nessus)\b/i, name: 'Automated Vulnerability & Exploit Scanner' },
   ];
 
+  // Regex rules for BeEF (Browser Exploitation Framework) C2 Hooks & DOM Hijacking
+  private beefHookPatterns = [
+    { regex: /(:3000\/hook\.js|\/hook\.js\b|beef\.init\b|beef\.net\b|BEEFHOOK=)/i, name: 'BeEF Browser Exploitation C2 Hook (hook.js)' },
+    { regex: /(pretty_theft|fake_notification_bar|clippy_siren|beef_dom_overlay|\/dh\?bh=)/i, name: 'BeEF DOM Credential Theft Overlay (Pretty Theft / Session Hijack)' },
+  ];
+
+  // Regex rules for Social-Engineering Toolkit (SET) Site Cloners & Credential Harvester Proxies
+  private setSocialEngineeringPatterns = [
+    { regex: /\b(Social-Engineering-Toolkit|SET-Credential-Harvester|HTTrack|wget\s+--mirror|SiteCloner-Bot)\b/i, name: 'SET Automated Login Portal Site Cloner' },
+    { regex: /(n0un-hrms|noun-hrms-login|noun-payroll-verify|X-SET-Harvester-Relay|phish_relay_origin=)/i, name: 'SET Lookalike Domain & Credential Harvester Relay' },
+  ];
+
   /**
    * Evaluates incoming request parameters, headers, URL, and body for attack vectors
    */
@@ -61,6 +73,36 @@ export class HeuristicEngine {
     clientIp: string;
   }): HeuristicMatchResult {
     const combinedTarget = `${data.method} ${data.path} ${data.payload || ''} ${data.userAgent || ''}`;
+
+    // 0A. Check BeEF Browser Exploitation Hooks & DOM Overlays
+    for (const rule of this.beefHookPatterns) {
+      if (rule.regex.test(combinedTarget)) {
+        return {
+          detected: true,
+          incidentType: 'BEEF_BROWSER_HOOK',
+          threatClassification: rule.name,
+          severity: 'CRITICAL',
+          matchedRule: rule.regex.toString(),
+          mitigationBlueprint: this.generateWafMitigation(data.clientIp, data.path, 'BeEF_Browser_Hook'),
+          remediationSummary: `Intercepted BeEF Browser Exploitation signature "${rule.name}" targeting ${data.path}. Enforce strict Content-Security-Policy (script-src 'self'; connect-src 'self'; frame-ancestors 'none'), deploy MutationObserver DOM integrity guard, and quarantine C2 IP ${data.clientIp}.`,
+        };
+      }
+    }
+
+    // 0B. Check Social-Engineering Toolkit (SET) Site Cloners & Harvester Relays
+    for (const rule of this.setSocialEngineeringPatterns) {
+      if (rule.regex.test(combinedTarget)) {
+        return {
+          detected: true,
+          incidentType: 'SET_SOCIAL_ENGINEERING',
+          threatClassification: rule.name,
+          severity: 'CRITICAL',
+          matchedRule: rule.regex.toString(),
+          mitigationBlueprint: this.generateWafMitigation(data.clientIp, data.path, 'SET_Phishing_Harvester'),
+          remediationSummary: `Intercepted Social-Engineering Toolkit (SET) vector "${rule.name}" targeting ${data.path}. Enforce strict Origin/Referer validation on authentication endpoints, enable anti-cloning frame-busting headers, and permanently block harvester IP ${data.clientIp}.`,
+        };
+      }
+    }
 
     // 1. Check SQL Injection
     for (const rule of this.sqliPatterns) {
