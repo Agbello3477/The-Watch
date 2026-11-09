@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { HealthGaugeCard } from './components/HealthGaugeCard';
 import { ThreatMap } from './components/ThreatMap';
 import { HeartbeatGrid } from './components/HeartbeatGrid';
+import { ObservabilityMatrix } from './components/ObservabilityMatrix';
 import { IncidentFeed } from './components/IncidentFeed';
 import { QueryLatencyAnalyzer } from './components/QueryLatencyAnalyzer';
 import { RemediationAdvisor } from './components/RemediationAdvisor';
@@ -375,7 +376,7 @@ export const App: React.FC = () => {
                   }`}
                 >
                   <Activity className="w-3.5 h-3.5" />
-                  <span>Probes & Query Latency</span>
+                  <span>7-Level Observability &amp; Probes</span>
                 </button>
 
                 <button
@@ -491,6 +492,14 @@ export const App: React.FC = () => {
 
             {activeSocTab === 'observability' && (
               <div className="space-y-6">
+                <ObservabilityMatrix
+                  overview={overview}
+                  probes={probes}
+                  incidents={incidents}
+                  queryMetrics={queryMetrics}
+                  advisorData={advisorData}
+                  onSelectTab={(tab) => setActiveSocTab(tab)}
+                />
                 <HeartbeatGrid probes={probes} onRunProbe={handleRunProbe} />
                 <QueryLatencyAnalyzer data={queryMetrics} />
               </div>
