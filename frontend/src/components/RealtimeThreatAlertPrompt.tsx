@@ -347,7 +347,7 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
   const [traceResults, setTraceResults] = useState<Record<string, IpTraceResult>>({});
 
   const seenIdsRef = useRef<Set<string>>(new Set());
-  const lastTimestampRef = useRef<string>(new Date(Date.now() - 30000).toISOString());
+  const lastTimestampRef = useRef<string>(new Date().toISOString());
   const sirenLoopRef = useRef<any>(null);
   const voiceLoopRef = useRef<any>(null);
   const wakeLockSentinelRef = useRef<any>(null);
@@ -715,6 +715,8 @@ export const RealtimeThreatAlertPrompt: React.FC<RealtimeThreatAlertPromptProps>
 
   const pushAlert = useCallback(
     (alert: LiveThreatAlert, fromBroadcast = false) => {
+      // Never trigger an intrusion alarm on internal UI click audit logs
+      if (String(alert.capturedPayload || '').startsWith('Clicked <')) return;
       if (seenIdsRef.current.has(alert.id)) return;
       seenIdsRef.current.add(alert.id);
 

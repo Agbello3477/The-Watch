@@ -155,6 +155,7 @@ export const App: React.FC = () => {
 
       api.trackUserAction({
         action: 'CLICK',
+        systemId: 'THE-WATCH-SOC',
         details,
         target: rawText,
       });
@@ -275,6 +276,15 @@ export const App: React.FC = () => {
     } catch {}
     fetchData();
   }, [fetchData]);
+
+  // Automatically bring the user onto The Watch SOC screen if they are on the Home screen or another browser tab,
+  // WITHOUT kicking them out of whichever SOC page/tab they are currently working on.
+  const handleAutoNavigateOnAlarm = useCallback((_alert: LiveThreatAlert) => {
+    setCurrentView((prevView) => (prevView === 'home' ? 'dashboard' : prevView));
+    try {
+      window.focus();
+    } catch {}
+  }, []);
 
   return (
     <>
@@ -559,7 +569,7 @@ export const App: React.FC = () => {
       {/* Real-time Threat Alert Floating HUD Prompt (Mounted persistently across all screens & tabs) */}
       <RealtimeThreatAlertPrompt
         onViewWarRoom={handleViewThreatInWarRoom}
-        onAlarmTriggered={handleViewThreatInWarRoom}
+        onAlarmTriggered={handleAutoNavigateOnAlarm}
         onAlertNeutralized={() => fetchData()}
       />
 

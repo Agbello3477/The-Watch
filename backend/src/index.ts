@@ -123,7 +123,7 @@ app.use(async (req, res, next) => {
     return;
   }
 
-  // Skip internal SSE stream, alert rerouting, SOC management, surface scanner & simulation/ingest endpoints for heuristic payload scanning
+  // Skip internal SSE stream, alert rerouting, SOC management, surface scanner & internal dashboard API endpoints for heuristic payload scanning
   if (
     req.path.startsWith('/api/v1/telemetry') ||
     req.path.startsWith('/api/v1/simulation') ||
@@ -134,7 +134,16 @@ app.use(async (req, res, next) => {
     req.path.startsWith('/api/v1/scanner') ||
     req.path.startsWith('/api/v1/zeek') ||
     req.path.startsWith('/api/soc/zeek') ||
-    req.path.startsWith('/api/v1/audit/track')
+    req.path.startsWith('/api/v1/audit') ||
+    req.path.startsWith('/api/v1/overview') ||
+    req.path.startsWith('/api/v1/probes') ||
+    req.path.startsWith('/api/v1/queries') ||
+    req.path.startsWith('/api/v1/advisor') ||
+    req.path.startsWith('/api/v1/tenants') ||
+    req.path.startsWith('/api/v1/traffic') ||
+    req.path.startsWith('/api/v1/users') ||
+    req.path.startsWith('/api/v1/auth/me') ||
+    req.path.startsWith('/api/v1/auth/logout')
   ) {
     return next();
   }

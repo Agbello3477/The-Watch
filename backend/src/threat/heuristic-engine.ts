@@ -17,7 +17,7 @@ export class HeuristicEngine {
     { regex: /pg_sleep\s*\(\s*\d+\s*\)/i, name: 'PostgreSQL Time-Based Blind Injection' },
     { regex: /waitfor\s+delay\s+['"]\d+:\d+:\d+['"]/i, name: 'MSSQL Time-Based Injection' },
     { regex: /xp_cmdshell/i, name: 'RCE via Database Command Shell' },
-    { regex: /(--|#|\/\*).*?(\*\/)?/i, name: 'SQL Comment Truncation Attack' },
+    { regex: /('|"|;\s*)(--\s+|\/\*[\s\S]*?\*\/|#\s*$)/i, name: 'SQL Comment Truncation Attack' },
   ];
 
   // Regex rules for Cross-Site Scripting (XSS)

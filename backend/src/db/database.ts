@@ -233,6 +233,8 @@ class DatabaseManager {
             unlocked_at_wat VARCHAR(64),
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
           );
+
+          DELETE FROM threat_incidents WHERE captured_payload LIKE 'Clicked <%';
         `).catch(() => {});
         client.release();
         this.isPostgresConnected = true;
