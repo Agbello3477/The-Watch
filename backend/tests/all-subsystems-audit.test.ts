@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { db } from '../src/db/database';
 import { REGISTERED_TENANTS } from '../src/config';
 import { socEngine } from '../src/soc/soc-engine';
+import { zeroTrustDeceptionEngine } from '../src/soc/zero-trust-deception-engine';
 import { heuristicEngine } from '../src/threat/heuristic-engine';
 import { zeekEngine } from '../src/zeek/zeek-engine';
 import { advisorService } from '../src/advisor/advisor-service';
@@ -136,5 +137,45 @@ describe('Full 7-Level Observability & All Subsystems Operational Verification',
     expect(pdfBuf.toString('utf-8', 0, 5)).toBe('%PDF-');
     const csvStr = await csvReportGenerator.generateCsv();
     expect(csvStr).toContain('IncidentID,SystemID,TimestampWAT');
+  });
+
+  it('Active Deception (Honeypots/Canaries), Zero-Trust Geo-Velocity & SHA-256 FIM / DLP Suite', () => {
+    const snapshot = zeroTrustDeceptionEngine.getDashboardSnapshot();
+    expect(snapshot.traps.length).toBeGreaterThanOrEqual(5);
+    expect(snapshot.dlpPolicies.length).toBeGreaterThanOrEqual(3);
+    expect(snapshot.fimReport.allIntact).toBe(true);
+    expect(snapshot.fimReport.files.length).toBe(6);
+
+    // Haversine Geo-Velocity check (Abuja -> Frankfurt > 4000 km)
+    const distKm = zeroTrustDeceptionEngine.calculateHaversineKm(9.0765, 7.3986, 50.1109, 8.6821);
+    expect(distKm).toBeGreaterThan(4000);
+
+    // Heuristic WAF evaluation for Honeypot, Zero-Trust Session Hijack, and DLP Mass Exfiltration
+    const hpMatch = heuristicEngine.evaluate({
+      method: 'GET',
+      path: '/.env.production',
+      payload: 'CANARY-TOKEN-WATCH-ROOT-ENV-9921',
+      clientIp: '185.220.101.88',
+    });
+    expect(hpMatch.detected).toBe(true);
+    expect(hpMatch.incidentType).toBe('HONEYPOT_DECEPTION_TRAP');
+
+    const ztMatch = heuristicEngine.evaluate({
+      method: 'POST',
+      path: '/api/v1/payroll/approve-batch',
+      payload: 'X-Impossible-Travel-Anomaly: geo_velocity_kmh=88420',
+      clientIp: '185.220.101.77',
+    });
+    expect(ztMatch.detected).toBe(true);
+    expect(ztMatch.incidentType).toBe('ZERO_TRUST_SESSION_HIJACK');
+
+    const dlpMatch = heuristicEngine.evaluate({
+      method: 'POST',
+      path: '/api/v1/payroll/export',
+      payload: 'export_all_staff_bvn=true&bulk_payroll_dump=1',
+      clientIp: '45.154.255.120',
+    });
+    expect(dlpMatch.detected).toBe(true);
+    expect(dlpMatch.incidentType).toBe('DLP_MASS_EXFILTRATION');
   });
 });

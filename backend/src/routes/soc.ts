@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { socEngine } from '../soc/soc-engine';
+import { zeroTrustDeceptionEngine } from '../soc/zero-trust-deception-engine';
 import { authenticateUser, requireSuperAdmin, AuthenticatedUserRequest } from '../middleware/user-auth';
 import { db, getWATFormattedDate } from '../db/database';
 import { authService } from '../auth/auth-service';
@@ -596,6 +597,235 @@ socRouter.post('/human-browser-defense/simulate', async (req: Request, res: Resp
   res.status(201).json({
     simulated: true,
     scenario: scenario || 'BEEF_HOOK_INJECTION',
+    incident,
+    defenseAction: chosen.defenseAction,
+    timestampWat: getWATFormattedDate(),
+  });
+});
+
+// ─── 10. Unified Active Deception (Honeypots & Canary Tokens), Zero-Trust Session Guard & DLP/FIM Suite ───
+socRouter.get('/zero-trust-deception', async (req: Request, res: Response) => {
+  const systemId = req.query.systemId ? String(req.query.systemId) : undefined;
+  const snapshot = zeroTrustDeceptionEngine.getDashboardSnapshot();
+  const allIncidents = await db.getIncidents({ systemId, limit: 100 });
+
+  const interceptedEvents = allIncidents.filter(
+    (i) =>
+      i.incident_type === 'HONEYPOT_DECEPTION_TRAP' ||
+      i.incident_type === 'ZERO_TRUST_SESSION_HIJACK' ||
+      i.incident_type === 'DLP_MASS_EXFILTRATION' ||
+      /honeypot|canary|impossible-travel|token replay|dlp|fim_sha256/i.test(
+        `${i.threat_classification} ${i.captured_payload}`
+      )
+  );
+
+  res.json({
+    posture: {
+      honeypotDeceptionStatus: 'ARMED_ZERO_FALSE_POSITIVE',
+      canaryBeaconStatus: 'ACTIVE_PHONE_HOME_TRACKING',
+      zeroTrustGeoVelocityGuard: 'ENFORCING (< 900 KM/H + JA3/IP TOKEN BINDING)',
+      dlpCircuitBreakerStatus: 'ENFORCING_BULK_BVN_PAYROLL_GUARD',
+      fimSha256Status: snapshot.fimReport.allIntact ? 'ALL_CORE_FILES_VERIFIED_INTACT' : 'TAMPER_ALERT_ACTIVE',
+    },
+    ...snapshot,
+    interceptedEvents: interceptedEvents.slice(0, 25),
+    drills: [
+      {
+        id: 'HONEYPOT_ENV_BACKUP_TRAP',
+        pillar: 'PILLAR 1: ACTIVE DECEPTION (HONEYPOT)',
+        title: 'Honeypot Decoy Secret & Payroll Dump Tripwire',
+        mitre: 'T1552.001 — Unsecured Credentials & Decoy Endpoint Recon',
+        description:
+          'Simulates a stealth attacker probing /.env.production and /api/v1/payroll/master-bvn-dump.csv. Triggers a 0% false-positive deterministic tripwire and permanent IP quarantine.',
+      },
+      {
+        id: 'CANARY_TOKEN_DOCUMENT_BEACON',
+        pillar: 'PILLAR 1: ACTIVE DECEPTION (CANARY TOKEN)',
+        title: 'Exfiltrated Executive Payroll Canary Document Phone-Home',
+        mitre: 'T1567 — Canary Token Beacon Callback',
+        description:
+          'Simulates an attacker opening a stolen NOUN_2026_Executive_Payroll_Confidential.xlsx file outside the network, firing the embedded CANARY-TOKEN-NOUN-PAYROLL-2026 beacon.',
+      },
+      {
+        id: 'IMPOSSIBLE_TRAVEL_TOKEN_REPLAY',
+        pillar: 'PILLAR 2: ZERO-TRUST SESSION GUARD',
+        title: 'Impossible-Travel Geo-Velocity & Stolen JWT Token Replay',
+        mitre: 'T1550.004 — Web Session Cookie / JWT Replay Across Continents',
+        description:
+          'Simulates a session authenticated in Abuja (197.210.64.12) being replayed 3 minutes later from Frankfurt (185.220.101.77 — 88,420 km/h geo-velocity) with a mismatched device fingerprint.',
+      },
+      {
+        id: 'DLP_MASS_BVN_PAYROLL_EXFIL',
+        pillar: 'PILLAR 3: DLP & FILE INTEGRITY (FIM)',
+        title: 'DLP Circuit Breaker: Mass Staff BVN & Salary Exfiltration',
+        mitre: 'T1048 — Bulk Exfiltration of Sensitive HR / BVN Records',
+        description:
+          'Simulates a compromised insider session attempting an unpaginated dump of 14,500 NOUN staff BVN and bank account records, tripping the DLP Circuit Breaker.',
+      },
+    ],
+    timestampWat: getWATFormattedDate(),
+  });
+});
+
+socRouter.post('/zero-trust-deception/fim-verify', (_req: Request, res: Response) => {
+  const report = zeroTrustDeceptionEngine.verifyFileIntegrity();
+  res.json({
+    verified: true,
+    fimReport: report,
+    timestampWat: getWATFormattedDate(),
+  });
+});
+
+socRouter.post('/zero-trust-deception/simulate', async (req: Request, res: Response) => {
+  const { scenario, targetSystem } = req.body || {};
+  const systemId = targetSystem || 'NOUN-HRMS';
+
+  const scenarios: Record<
+    string,
+    {
+      ip: string;
+      method: string;
+      path: string;
+      payload: string;
+      userAgent: string;
+      defenseAction: string;
+      onTrigger: () => void;
+    }
+  > = {
+    HONEYPOT_ENV_BACKUP_TRAP: {
+      ip: '185.220.101.88',
+      method: 'GET',
+      path: '/.env.production',
+      payload: `GET /.env.production & /api/v1/payroll/master-bvn-dump.csv | Decoy Token: CANARY-TOKEN-WATCH-ROOT-ENV-9921`,
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64) StealthRecon/3.1',
+      defenseAction:
+        'Honeypot Tripwire Activated (0% False-Positive Rate) + Wake-Up Alarm Triggered + Attacker IP 185.220.101.88 Permanently Quarantined',
+      onTrigger: () => {
+        zeroTrustDeceptionEngine.recordTrapHit('TRAP-HP-01', '185.220.101.88');
+      },
+    },
+    CANARY_TOKEN_DOCUMENT_BEACON: {
+      ip: '91.215.85.42',
+      method: 'GET',
+      path: '/api/v1/canary/beacon/CANARY-TOKEN-NOUN-PAYROLL-2026',
+      payload: `Canary Document Opened: NOUN_2026_Executive_Payroll_Confidential.xlsx | Token: CANARY-TOKEN-NOUN-PAYROLL-2026 | Hostname: WORKSTATION-EXFIL-09`,
+      userAgent: 'Microsoft Office Excel/16.0 (Windows NT 10.0; Win64; x64)',
+      defenseAction:
+        'Canary Document Beacon Tracked External Host + GeoIP Resolved + Offending IP 91.215.85.42 Permanently Quarantined',
+      onTrigger: () => {
+        zeroTrustDeceptionEngine.recordTrapHit('TRAP-CN-04', '91.215.85.42');
+      },
+    },
+    IMPOSSIBLE_TRAVEL_TOKEN_REPLAY: {
+      ip: '185.220.101.77',
+      method: 'POST',
+      path: '/api/v1/payroll/approve-batch',
+      payload: `X-Impossible-Travel-Anomaly: origin="Abuja, NG (197.210.64.12)" -> current="Frankfurt, DE (185.220.101.77)" | geo_velocity_kmh=88420 | X-Token-Fingerprint-Mismatch: expected=8a41f9c2 != observed=e019b3d4`,
+      userAgent: 'python-requests/2.31.0 (Token-Hijack-Replay)',
+      defenseAction:
+        'Zero-Trust Geo-Velocity Violation (88,420 km/h > 900 km/h limit) + Active JWT Token Revoked + Hijacker IP 185.220.101.77 Permanently Quarantined',
+      onTrigger: () => {
+        zeroTrustDeceptionEngine.recordZeroTrustAnomaly({
+          accountEmail: 'bursary.payroll.officer@noun.edu.ng',
+          role: 'PAYROLL_OFFICER',
+          systemId,
+          anomalyType: 'IMPOSSIBLE_TRAVEL_GEO_VELOCITY',
+          originIp: '197.210.64.12',
+          originLocation: 'Abuja (FCT), Nigeria',
+          originLat: 9.0765,
+          originLng: 7.3986,
+          anomalyIp: '185.220.101.77',
+          anomalyLocation: 'Frankfurt, Germany (Tor Exit)',
+          anomalyLat: 50.1109,
+          anomalyLng: 8.6821,
+          timeDeltaMinutes: 3,
+        });
+      },
+    },
+    DLP_MASS_BVN_PAYROLL_EXFIL: {
+      ip: '45.154.255.120',
+      method: 'POST',
+      path: '/api/v1/payroll/export',
+      payload: `export_all_staff_bvn=true&bulk_payroll_dump=1&limit=10000&fields=staff_id,full_name,bvn,account_number,net_salary`,
+      userAgent: 'Mozilla/5.0 (Insider-Exfil-Script/1.4)',
+      defenseAction:
+        'DLP Circuit Breaker Tripped (14,500 BVN rows requested vs 50 max policy) + Data Stream Aborted + Session Locked & IP 45.154.255.120 Quarantined',
+      onTrigger: () => {
+        zeroTrustDeceptionEngine.recordDlpBlock('DLP-POL-01');
+      },
+    },
+  };
+
+  const chosenKey = scenario && scenarios[scenario] ? scenario : 'HONEYPOT_ENV_BACKUP_TRAP';
+  const chosen = scenarios[chosenKey];
+  chosen.onTrigger();
+
+  const match = heuristicEngine.evaluate({
+    method: chosen.method,
+    path: chosen.path,
+    payload: chosen.payload,
+    userAgent: chosen.userAgent,
+    clientIp: chosen.ip,
+  });
+
+  const geo = await geoIPService.resolve(chosen.ip);
+  const incident = {
+    id: `inc-ztd-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    system_id: systemId,
+    incident_type: match.detected ? match.incidentType : 'HONEYPOT_DECEPTION_TRAP',
+    threat_classification: match.detected ? match.threatClassification : 'Zero-Trust / Active Deception Tripwire',
+    severity: 'CRITICAL' as const,
+    offending_ip: chosen.ip,
+    geo_country: geo.country,
+    geo_region: geo.region,
+    geo_city: geo.city,
+    geo_lat: geo.latitude,
+    geo_lng: geo.longitude,
+    asn: geo.asn,
+    isp: geo.isp,
+    is_proxy_or_vpn: geo.isProxyOrVpn,
+    target_endpoint: chosen.path,
+    http_method: chosen.method,
+    captured_payload: chosen.payload,
+    status: 'UNRESOLVED' as const,
+    mitigation_blueprint: match.mitigationBlueprint,
+    remediation_summary: match.remediationSummary,
+    created_at_wat: getWATFormattedDate(),
+  };
+
+  await db.saveIncident(incident);
+  realtimeAlertHub.broadcastThreat(incident);
+  socEngine.createCaseFromIncident({
+    id: incident.id,
+    systemId,
+    threatClassification: incident.threat_classification,
+    severity: 'CRITICAL',
+    offendingIp: chosen.ip,
+    targetEndpoint: chosen.path,
+    capturedPayload: chosen.payload,
+  });
+  socEngine.blockIp({
+    ip: chosen.ip,
+    reason: `Zero-Trust / Deception Auto-Quarantine: ${incident.threat_classification}`,
+    threatClassification: incident.threat_classification,
+    systemId: `${systemId} & THE-WATCH-SOC`,
+    blockedBy: 'Zero-Trust, Honeypot & DLP SOAR Engine',
+  });
+
+  ingestQueue.enqueue({
+    systemId,
+    method: chosen.method,
+    path: chosen.path,
+    statusCode: 403,
+    latencyMs: 2,
+    clientIp: chosen.ip,
+    payloadSnippet: `[BLOCKED_BY_ZERO_TRUST_DECEPTION_DLP] ${chosen.payload}`,
+    userAgent: chosen.userAgent,
+  });
+
+  res.status(201).json({
+    simulated: true,
+    scenario: chosenKey,
     incident,
     defenseAction: chosen.defenseAction,
     timestampWat: getWATFormattedDate(),

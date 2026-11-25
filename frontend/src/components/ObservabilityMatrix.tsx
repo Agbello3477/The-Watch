@@ -28,6 +28,7 @@ export type SocTabKey =
   | 'reports'
   | 'simulator'
   | 'beef-set'
+  | 'zero-trust-deception'
   | 'traffic'
   | 'scanner'
   | 'zeek'
@@ -143,21 +144,21 @@ export const ObservabilityMatrix: React.FC<ObservabilityMatrixProps> = ({
       level: 'LEVEL 6',
       name: 'Identity, Session & Browser/Human-Layer Observability (UEBA)',
       status: 'RESOLVED' as const,
-      statusLabel: 'WAT AUDIT + ANTI-BEEF/SET',
-      engine: 'Real-Time Click Audit + Anti-BeEF Hook & Anti-SET Clone Guard',
+      statusLabel: 'ZERO-TRUST + ANTI-BEEF/SET',
+      engine: 'Impossible-Travel Geo-Velocity + Anti-BeEF Hook & Anti-SET Clone Guard',
       description:
-        'Captures every operator/staff login, logout, PDF/CSV export, UI click, DOM MutationObserver BeEF hook attempt, and SET credential harvester clone with GeoIP & WAT timestamps.',
+        'Captures every login, logout, PDF/CSV export, UI click, Haversine impossible-travel session replay, DOM MutationObserver BeEF hook, and SET credential harvester clone.',
       metrics: [
-        { label: 'Inactivity & Hook Guard', value: '180s Timeout + DOM CSP Shield' },
+        { label: 'Session & Hook Guard', value: 'Haversine <900km/h + DOM CSP Shield' },
         { label: 'Audit Timezone', value: 'Africa/Lagos (WAT / UTC+1)' },
       ],
       icon: Users,
       primaryAction: { label: 'Open BeEF & SET Defense', tab: 'beef-set' as SocTabKey },
-      secondaryAction: { label: 'Forensic Audit Reports', tab: 'reports' as SocTabKey },
+      secondaryAction: { label: 'Zero-Trust & Honeypot Suite', tab: 'zero-trust-deception' as SocTabKey },
     },
     {
       level: 'LEVEL 7',
-      name: 'Threat Intelligence, SOAR & Self-Healing Observability',
+      name: 'Threat Intelligence, Deception (Honeypots/Canaries), DLP/FIM & SOAR',
       status: criticalThreats > 0 ? ('CRITICAL' as const) : unresolvedThreats > 0 ? ('HIGH' as const) : ('RESOLVED' as const),
       statusLabel:
         criticalThreats > 0
@@ -165,16 +166,16 @@ export const ObservabilityMatrix: React.FC<ObservabilityMatrixProps> = ({
           : unresolvedThreats > 0
           ? `${unresolvedThreats} OPEN INCIDENTS`
           : 'ALL THREATS MITIGATED',
-      engine: 'Heuristic WAF + Permanent Super-Admin IP Quarantine + Advisor',
+      engine: 'Heuristic WAF + Honeypots/Canaries + SHA-256 FIM & DLP + Permanent Quarantine',
       description:
-        'Real-time SQLi/XSS/RCE/Traversal detection, MITRE ATT&CK case management, permanent cross-system IP blocking (unlockable only by Super Admin), and wake-up alarm failover.',
+        'Real-time SQLi/XSS/RCE detection, 0% false-positive Honeypot & Canary Token traps, live SHA-256 File Integrity Monitoring, DLP BVN exfiltration circuit breaker, and permanent IP blocking.',
       metrics: [
         { label: 'Active Incidents', value: `${unresolvedThreats} Unresolved (${criticalThreats} Critical)` },
-        { label: 'Self-Healing Blueprints', value: `${recommendationsCount} Remediation Patches` },
+        { label: 'Deception & FIM', value: '5 Traps Armed + 6 Core Files SHA-256 Verified' },
       ],
       icon: ShieldAlert,
       primaryAction: { label: 'Open SOC War Room', tab: 'soc' as SocTabKey },
-      secondaryAction: { label: 'Self-Healing Advisor', tab: 'advisor' as SocTabKey },
+      secondaryAction: { label: 'Honeypot, Zero-Trust & DLP', tab: 'zero-trust-deception' as SocTabKey },
     },
   ];
 

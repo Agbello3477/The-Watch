@@ -62,6 +62,24 @@ export class HeuristicEngine {
     { regex: /(n0un-hrms|noun-hrms-login|noun-payroll-verify|X-SET-Harvester-Relay|phish_relay_origin=)/i, name: 'SET Lookalike Domain & Credential Harvester Relay' },
   ];
 
+  // Regex rules for Active Deception Honeypots & Canary Tokens (Zero-False-Positive Tripwires)
+  private honeypotDeceptionPatterns = [
+    { regex: /(\/\.env\.production|\/\.env\.local|\/\.env\b|\/admin\/db-backup\.sql|\/api\/v1\/payroll\/master-bvn-dump\.csv|\/api\/v1\/auth\/root-keys)/i, name: 'Honeypot Decoy Endpoint Tripwire (Zero-False-Positive Trap)' },
+    { regex: /(CANARY-TOKEN-NOUN-|CANARY-TOKEN-WATCH-|\/api\/v1\/canary\/beacon\/|honey_credential_trap=)/i, name: 'Canary Token Exfiltrated Document / Honey-Credential Beacon' },
+  ];
+
+  // Regex rules for Zero-Trust Impossible Travel & Session Token Replay Hijacking
+  private zeroTrustSessionPatterns = [
+    { regex: /(X-Impossible-Travel-Anomaly|impossible_travel_velocity=|geo_velocity_kmh=[1-9]\d{3,})/i, name: 'Zero-Trust UEBA Impossible-Travel Geo-Velocity Anomaly' },
+    { regex: /(X-Token-Fingerprint-Mismatch|session_replay_hijack=1|ja3_token_binding_violation)/i, name: 'Zero-Trust Stolen JWT Session Token Replay / Fingerprint Mismatch' },
+  ];
+
+  // Regex rules for Data Loss Prevention (DLP) Mass Payroll / BVN Exfiltration & FIM Tampering
+  private dlpExfiltrationPatterns = [
+    { regex: /(export_all_staff_bvn=true|bulk_payroll_dump=1|X-DLP-Mass-Export-Probe|limit=(5000|10000|50000)|bvn_bulk_harvest)/i, name: 'DLP Circuit Breaker: Unauthorized Mass BVN & Payroll Exfiltration' },
+    { regex: /(FIM_SHA256_TAMPER_DETECTED|unauthorized_webshell_drop=1)/i, name: 'Cryptographic File Integrity (SHA-256 FIM) Tamper Alert' },
+  ];
+
   /**
    * Evaluates incoming request parameters, headers, URL, and body for attack vectors
    */
@@ -100,6 +118,51 @@ export class HeuristicEngine {
           matchedRule: rule.regex.toString(),
           mitigationBlueprint: this.generateWafMitigation(data.clientIp, data.path, 'SET_Phishing_Harvester'),
           remediationSummary: `Intercepted Social-Engineering Toolkit (SET) vector "${rule.name}" targeting ${data.path}. Enforce strict Origin/Referer validation on authentication endpoints, enable anti-cloning frame-busting headers, and permanently block harvester IP ${data.clientIp}.`,
+        };
+      }
+    }
+
+    // 0C. Check Active Deception Honeypots & Canary Tokens
+    for (const rule of this.honeypotDeceptionPatterns) {
+      if (rule.regex.test(combinedTarget)) {
+        return {
+          detected: true,
+          incidentType: 'HONEYPOT_DECEPTION_TRAP',
+          threatClassification: rule.name,
+          severity: 'CRITICAL',
+          matchedRule: rule.regex.toString(),
+          mitigationBlueprint: this.generateWafMitigation(data.clientIp, data.path, 'Active_Deception_Honeypot'),
+          remediationSummary: `Zero-false-positive deception tripwire "${rule.name}" triggered on ${data.path} by ${data.clientIp}. No legitimate user or workflow touches this decoy resource — immediately revoke credentials and permanently quarantine IP ${data.clientIp}.`,
+        };
+      }
+    }
+
+    // 0D. Check Zero-Trust Session Guard (Impossible Travel & Stolen Token Replay)
+    for (const rule of this.zeroTrustSessionPatterns) {
+      if (rule.regex.test(combinedTarget)) {
+        return {
+          detected: true,
+          incidentType: 'ZERO_TRUST_SESSION_HIJACK',
+          threatClassification: rule.name,
+          severity: 'CRITICAL',
+          matchedRule: rule.regex.toString(),
+          mitigationBlueprint: this.generateWafMitigation(data.clientIp, data.path, 'ZeroTrust_Session_Guard'),
+          remediationSummary: `Zero-Trust Session Guard intercepted "${rule.name}" on ${data.path}. Immediately invalidate active JWT session token, enforce step-up re-authentication, and quarantine hijacker IP ${data.clientIp}.`,
+        };
+      }
+    }
+
+    // 0E. Check DLP Mass Exfiltration & Cryptographic File Integrity (FIM)
+    for (const rule of this.dlpExfiltrationPatterns) {
+      if (rule.regex.test(combinedTarget)) {
+        return {
+          detected: true,
+          incidentType: 'DLP_MASS_EXFILTRATION',
+          threatClassification: rule.name,
+          severity: 'CRITICAL',
+          matchedRule: rule.regex.toString(),
+          mitigationBlueprint: this.generateWafMitigation(data.clientIp, data.path, 'DLP_Exfiltration_Breaker'),
+          remediationSummary: `DLP / FIM Guard intercepted "${rule.name}" targeting ${data.path}. Abort bulk data transfer, suspend compromised session, and lock offending IP ${data.clientIp}.`,
         };
       }
     }

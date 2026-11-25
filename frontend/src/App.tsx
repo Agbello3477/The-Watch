@@ -10,6 +10,7 @@ import { RemediationAdvisor } from './components/RemediationAdvisor';
 import { ReportExporter } from './components/ReportExporter';
 import { AttackSimulator } from './components/AttackSimulator';
 import { BrowserPhishingDefense } from './components/BrowserPhishingDefense';
+import { ZeroTrustDeceptionSuite } from './components/ZeroTrustDeceptionSuite';
 import { TrafficMonitor } from './components/TrafficMonitor';
 import { SurfaceScanner } from './components/SurfaceScanner';
 import { ZeekNetworkMonitor } from './components/ZeekNetworkMonitor';
@@ -29,7 +30,7 @@ import {
   AdvisorResponse,
   AuthSessionUser,
 } from './types/dashboard';
-import { Globe, Activity, Sparkles, FileText, Flame, Users, ShieldCheck, ShieldAlert, Radar, Network, Bug } from 'lucide-react';
+import { Globe, Activity, Sparkles, FileText, Flame, Users, ShieldCheck, ShieldAlert, Radar, Network, Bug, Crosshair } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [selectedSystem, setSelectedSystem] = useState<string>('');
@@ -40,7 +41,7 @@ export const App: React.FC = () => {
     } catch {}
     return 'home';
   });
-  const [activeSocTab, setActiveSocTab] = useState<'soc' | 'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'beef-set' | 'traffic' | 'scanner' | 'zeek' | 'connect'>('soc');
+  const [activeSocTab, setActiveSocTab] = useState<'soc' | 'threats' | 'observability' | 'advisor' | 'reports' | 'simulator' | 'beef-set' | 'zero-trust-deception' | 'traffic' | 'scanner' | 'zeek' | 'connect'>('soc');
   
   // Auth state
   const [currentUser, setCurrentUser] = useState<AuthSessionUser | null>(authStorage.getUser());
@@ -429,6 +430,18 @@ export const App: React.FC = () => {
                 </button>
 
                 <button
+                  onClick={() => setActiveSocTab('zero-trust-deception')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
+                    activeSocTab === 'zero-trust-deception'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-500/40 shadow-sm'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-100 border-slate-700'
+                  }`}
+                >
+                  <Crosshair className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Honeypot, Zero-Trust &amp; DLP</span>
+                </button>
+
+                <button
                   onClick={() => setActiveSocTab('traffic')}
                   className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition border ${
                     activeSocTab === 'traffic'
@@ -542,6 +555,15 @@ export const App: React.FC = () => {
             {activeSocTab === 'beef-set' && (
               <div className="space-y-6">
                 <BrowserPhishingDefense
+                  selectedSystem={selectedSystem}
+                  onDrillExecuted={fetchData}
+                />
+              </div>
+            )}
+
+            {activeSocTab === 'zero-trust-deception' && (
+              <div className="space-y-6">
+                <ZeroTrustDeceptionSuite
                   selectedSystem={selectedSystem}
                   onDrillExecuted={fetchData}
                 />

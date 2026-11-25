@@ -352,6 +352,31 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Active Deception Honeypot & Canary Token Beacon Trap Endpoints (0% False-Positive Tripwires)
+app.all(
+  [
+    '/.env',
+    '/.env.production',
+    '/.env.local',
+    '/admin/db-backup.sql',
+    '/api/v1/payroll/master-bvn-dump.csv',
+    '/api/v1/auth/root-keys',
+    '/api/v1/canary/beacon/:tokenId',
+  ],
+  (req, res) => {
+    const clientIp = ((req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1')
+      .split(',')[0]
+      .trim();
+    res.status(403).json({
+      error: 'HONEYPOT_DECEPTION_TRAP_TRIGGERED',
+      message: `ACTIVE DECEPTION TRIPWIRE: Unauthorized access to decoy resource (${req.originalUrl || req.path}) from IP ${clientIp} has been logged and permanently quarantined across THE-WATCH-SOC & NOUN-HRMS.`,
+      trapResource: req.originalUrl || req.path,
+      offendingIp: clientIp,
+      timestampWat: getWATFormattedDate(),
+    });
+  }
+);
+
 async function seedInitialIncidents() {
   // Pre-seed a few realistic incidents so initial dashboard load is rich
   ingestQueue.enqueue([
