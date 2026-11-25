@@ -84,7 +84,7 @@ export class IngestQueue {
       clientIp,
     });
 
-    // Active SOC Firewall check: Drop immediately if IP is blacklisted
+    // Active SOC Firewall check: Log firewall drop if IP is blacklisted, and return early for non-exploit traffic
     if (socEngine.isIpBlocked(clientIp)) {
       socEngine.recordBlockedRequest(clientIp);
       await db.saveTelemetryLog({
@@ -95,11 +95,15 @@ export class IngestQueue {
         status_code: 403,
         latency_ms: 1,
         client_ip: clientIp,
-        payload_snippet: `[BLOCKED_BY_SOC_FIREWALL] Dropped request from quarantined IP`,
+        payload_snippet: preThreatMatch.detected
+          ? `[BLOCKED_BY_SOC_FIREWALL | ${preThreatMatch.threatClassification}] ${payloadSnippet || path}`
+          : `[BLOCKED_BY_SOC_FIREWALL] Dropped request from quarantined IP`,
         user_agent: userAgent,
         headers_json: JSON.stringify({
           verdict: 'MALICIOUS_BLOCKED',
-          threatClassification: 'Quarantined IP Firewall Drop',
+          threatClassification: preThreatMatch.detected
+            ? preThreatMatch.threatClassification
+            : 'Quarantined IP Firewall Drop',
           direction: 'INBOUND_REQ',
           protocol: 'HTTPS/TLSv1.3',
           sourcePort: 49152 + Math.floor(Math.random() * 15000),
@@ -108,7 +112,9 @@ export class IngestQueue {
           lengthBytes: 420 + (payloadSnippet ? payloadSnippet.length : 0),
         }),
       });
-      return;
+      if (!preThreatMatch.detected && queryLatencyMs === undefined && !queryText) {
+        return;
+      }
     }
 
     const packetVerdict = preThreatMatch.detected

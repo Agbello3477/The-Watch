@@ -70,7 +70,12 @@ export class AuthService {
 
     // 2b. Enforce Permanent SOC IP Blocklist:
     // Any IP that is blocked cannot log in or access The Watch or NOUN-HRMS unless authenticating as SUPER_ADMIN
-    if (socEngine.isIpBlocked(ipAddress) && (!user || user.role !== 'SUPER_ADMIN')) {
+    const blockEntry = socEngine.getBlockEntry(ipAddress);
+    const hasActiveAccountLockout =
+      Boolean(user?.locked_until && Date.now() < new Date(user.locked_until).getTime()) &&
+      blockEntry?.blockedBy === 'The Watch Active Brute-Force Guard';
+
+    if (socEngine.isIpBlocked(ipAddress) && (!user || user.role !== 'SUPER_ADMIN') && !hasActiveAccountLockout) {
       socEngine.recordBlockedRequest(ipAddress);
       const blockedAuditLog: UserAuditLog = {
         id: `ual-ipblk-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
